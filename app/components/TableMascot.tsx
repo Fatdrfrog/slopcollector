@@ -1,58 +1,22 @@
 import Image from 'next/image';
 
-const raccoonPlaceholderSvg = `
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 360">
-    <defs>
-      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#0f172a" />
-        <stop offset="100%" stop-color="#1e293b" />
-      </linearGradient>
-      <radialGradient id="highlight" cx="50%" cy="35%" r="60%">
-        <stop offset="0%" stop-color="#f8fafc" stop-opacity="0.9" />
-        <stop offset="100%" stop-color="#f8fafc" stop-opacity="0" />
-      </radialGradient>
-    </defs>
-    <rect width="400" height="360" rx="32" fill="url(#bg)" />
-    <ellipse cx="200" cy="260" rx="150" ry="60" fill="#0f172a" opacity="0.45" />
-    <g transform="translate(100 70)">
-      <ellipse cx="100" cy="120" rx="95" ry="85" fill="#1f2937" />
-      <ellipse cx="100" cy="105" rx="105" ry="95" fill="#111827" />
-      <ellipse cx="60" cy="110" rx="36" ry="30" fill="#f8fafc" />
-      <ellipse cx="140" cy="110" rx="36" ry="30" fill="#f8fafc" />
-      <circle cx="58" cy="113" r="16" fill="#0f172a" />
-      <circle cx="142" cy="113" r="16" fill="#0f172a" />
-      <path d="M40 60 C70 40 130 40 160 60 C140 35 60 35 40 60 Z" fill="#1f2937" />
-      <path d="M65 150 C90 170 110 170 135 150 C125 185 75 185 65 150 Z" fill="#f8fafc" />
-      <circle cx="100" cy="148" r="12" fill="#0f172a" />
-      <ellipse cx="35" cy="150" rx="32" ry="22" fill="#1f2937" />
-      <ellipse cx="165" cy="150" rx="32" ry="22" fill="#1f2937" />
-    </g>
-    <circle cx="200" cy="120" r="130" fill="url(#highlight)" />
-    <text x="200" y="335" text-anchor="middle" fill="#f8fafc" font-family="monospace" font-size="20">
-      Raccoon placeholder
-    </text>
-  </svg>
-`;
 
-const raccoonImage = `data:image/svg+xml;utf8,${encodeURIComponent(
-  raccoonPlaceholderSvg,
-)}`;
+
 
 export function TableMascot() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {/* Raccoon on the right side */}
       <div className="absolute right-[-50px] top-1/2 transform -translate-y-1/2 scale-[1.8] opacity-90">
-        <Image
-          src={raccoonImage}
-          alt="Raccoon mascot"
-          width={400}
-          height={360}
-          className="w-[400px] h-auto"
-          style={{
-            filter: 'drop-shadow(0 10px 40px rgba(0, 0, 0, 0.15))',
-          }}
-        />
+      <video 
+  autoPlay 
+  muted={true}
+  loop={true}
+  playsInline={true}
+  className="background-video"
+  poster="/raccoon-poster.jpg">
+  <source src="/raccoon.mp4" type="video/mp4" />
+</video>
         
         {/* Supabase table being eaten */}
         <div className="absolute top-[120px] left-[100px] animate-float-slow">

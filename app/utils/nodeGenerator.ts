@@ -1,5 +1,6 @@
 import type { Node } from '@xyflow/react';
 import type { Table } from '../types';
+import type { TableNodeData } from '../components/TableNode';
 
 /**
  * Convert tables to React Flow nodes
@@ -12,7 +13,7 @@ export function generateNodesFromTables(
   tables: Table[],
   selectedTable: string | null,
   onSelect: (id: string | null) => void
-): Node[] {
+): Node<TableNodeData>[] {
   return tables.map((table) => ({
     id: table.id,
     type: 'tableNode',

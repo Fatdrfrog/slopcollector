@@ -5,6 +5,7 @@ import { Zap, BookOpen, Database, Lightbulb, Target, Sparkles } from 'lucide-rea
 import { DockIcon } from './DockIcon';
 import { FeatureModal } from './FeatureModal';
 import { TableMascot } from './TableMascot';
+import { ConnectProjectDialog } from './ConnectProjectDialog';
 
 interface Feature {
   id: string;
@@ -108,13 +109,19 @@ interface LandingProps {
 
 export function Landing({ onConnect }: LandingProps) {
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
+  const [showConnectDialog, setShowConnectDialog] = useState(false);
 
   const handleIconClick = (feature: Feature) => {
     if (feature.id === 'connect') {
-      onConnect();
+      setShowConnectDialog(true);
     } else {
       setSelectedFeature(feature);
     }
+  };
+
+  const handleConnectSuccess = () => {
+    setShowConnectDialog(false);
+    onConnect();
   };
 
   return (
@@ -177,6 +184,13 @@ export function Landing({ onConnect }: LandingProps) {
           onClose={() => setSelectedFeature(null)}
         />
       )}
+
+      {/* Connect Project Dialog */}
+      <ConnectProjectDialog
+        open={showConnectDialog}
+        onClose={() => setShowConnectDialog(false)}
+        onSuccess={handleConnectSuccess}
+      />
     </div>
   );
 }

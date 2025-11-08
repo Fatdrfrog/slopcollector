@@ -1,25 +1,30 @@
-import { memo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { memo, type MouseEvent } from 'react';
+import { Handle, Position } from '@xyflow/react';
+import type { Node, NodeProps } from '@xyflow/react';
 import type { Table } from '../types';
 import { hasTableIssues, countCriticalIssues } from '../utils/tableAnalysis';
 import { TableNodeHeader } from './TableNodeHeader';
 import { ColumnRow } from './ColumnRow';
 
-interface TableNodeData {
+export interface TableNodeData extends Record<string, unknown> {
   table: Table;
   isSelected: boolean;
   onSelect: (id: string | null) => void;
 }
 
+type TableNodeRFNode = Node<TableNodeData>;
+
+type TableNodeProps = NodeProps<TableNodeRFNode>;
+
 /**
  * Custom React Flow node representing a database table
  */
-export const TableNode = memo(({ data }: NodeProps<TableNodeData>) => {
+export const TableNode = memo(({ data }: TableNodeProps) => {
   const { table, isSelected, onSelect } = data;
   const hasIssues = hasTableIssues(table);
   const criticalIssues = countCriticalIssues(table);
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (e: MouseEvent) => {
     e.stopPropagation();
     onSelect(table.id);
   };

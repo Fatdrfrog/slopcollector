@@ -1,14 +1,16 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
   MiniMap,
   useNodesState,
   useEdgesState,
-  NodeTypes,
+  BackgroundVariant,
+  type Node,
+  type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { TableNode } from './TableNode';
+import { TableNode, type TableNodeData } from './TableNode';
 import { KeyboardHints } from './KeyboardHints';
 import { generateNodesFromTables } from '../utils/nodeGenerator';
 import { generateEdgesFromTables } from '../utils/edgeGenerator';
@@ -28,7 +30,7 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
   // Generate nodes and edges from tables
   const initialNodes = useMemo(
     () => generateNodesFromTables(tables, selectedTable, onTableSelect),
-    [tables]
+    [tables, selectedTable, onTableSelect]
   );
 
   const initialEdges = useMemo(
@@ -36,24 +38,30 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
     [tables]
   );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(initialNodes);
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
   // Update nodes when selection changes
-  useMemo(() => {
+  useEffect(() => {
     setNodes((nds) =>
-      nds.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          isSelected: selectedTable === node.id,
-        },
-      }))
+      nds.map((node) => {
+        if (!node.data) {
+          return node;
+        }
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            isSelected: selectedTable === node.id,
+          },
+        };
+      })
     );
   }, [selectedTable, setNodes]);
 
   // Define custom node types
-  const nodeTypes: NodeTypes = useMemo(
+  const nodeTypes = useMemo<NodeTypes>(
     () => ({
       tableNode: TableNode,
     }),
@@ -66,11 +74,15 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
   }, [onTableSelect]);
 
   // Mini-map node coloring based on status
-  const getMiniMapNodeColor = useCallback((node: any) => {
-    const table = node.data.table as Table;
+  const getMiniMapNodeColor = useCallback((node: Node<TableNodeData>) => {
+    if (!node.data) {
+      return '#404040';
+    }
+
+    const { table, isSelected } = node.data;
     const hasIssues = hasTableIssues(table);
-    
-    if (node.data.isSelected) return '#6366f1';
+
+    if (isSelected) return '#6366f1';
     if (hasIssues) return '#f59e0b';
     return '#404040';
   }, []);
@@ -89,11 +101,11 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
         maxZoom={1.5}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
-        <Background 
-          gap={20} 
-          size={2} 
-          color="#1f1f1f" 
-          variant="dots"
+        <Background
+          gap={20}
+          size={2}
+          color="#1f1f1f"
+          variant={BackgroundVariant.Dots}
           style={{ backgroundColor: '#0f0f0f' }}
         />
         

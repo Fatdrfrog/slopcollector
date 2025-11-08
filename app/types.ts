@@ -19,6 +19,7 @@ export interface Table {
   columns: Column[];
   position: Position;
   rowCount?: number;
+  columnCount?: number;
 }
 
 export type SuggestionSeverity = 'warning' | 'info' | 'error';

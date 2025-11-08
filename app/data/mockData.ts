@@ -1,0 +1,275 @@
+import type { Table, Suggestion } from '../types';
+
+export const mockTables: Table[] = [
+  {
+    id: 'users',
+    name: 'users',
+    position: { x: 100, y: 100 },
+    rowCount: 45230,
+    columns: [
+      { name: 'id', type: 'uuid', nullable: false, primaryKey: true, indexed: true },
+      { name: 'email', type: 'varchar(255)', nullable: false, indexed: true },
+      { name: 'username', type: 'varchar(100)', nullable: false, indexed: true },
+      { name: 'created_at', type: 'timestamp', nullable: false, indexed: true },
+      { name: 'last_login', type: 'timestamp', nullable: true, indexed: false },
+      { name: 'legacy_user_id', type: 'integer', nullable: true, indexed: false, lastUsed: '2023-03-15' },
+      { name: 'profile_data', type: 'jsonb', nullable: true, indexed: false },
+    ],
+  },
+  {
+    id: 'posts',
+    name: 'posts',
+    position: { x: 500, y: 100 },
+    rowCount: 128450,
+    columns: [
+      { name: 'id', type: 'uuid', nullable: false, primaryKey: true, indexed: true },
+      { name: 'user_id', type: 'uuid', nullable: false, foreignKey: 'users.id', indexed: false },
+      { name: 'title', type: 'varchar(500)', nullable: false, indexed: false },
+      { name: 'content', type: 'text', nullable: false, indexed: false },
+      { name: 'created_at', type: 'timestamp', nullable: false, indexed: true },
+      { name: 'updated_at', type: 'timestamp', nullable: true, indexed: false },
+      { name: 'status', type: 'varchar(50)', nullable: false, indexed: false },
+    ],
+  },
+  {
+    id: 'comments',
+    name: 'comments',
+    position: { x: 900, y: 100 },
+    rowCount: 342100,
+    columns: [
+      { name: 'id', type: 'uuid', nullable: false, primaryKey: true, indexed: true },
+      { name: 'post_id', type: 'uuid', nullable: false, foreignKey: 'posts.id', indexed: false },
+      { name: 'user_id', type: 'uuid', nullable: false, foreignKey: 'users.id', indexed: false },
+      { name: 'content', type: 'text', nullable: false, indexed: false },
+      { name: 'created_at', type: 'timestamp', nullable: false, indexed: true },
+      { name: 'spam_checked', type: 'boolean', nullable: true, lastUsed: '2023-06-20' },
+    ],
+  },
+  {
+    id: 'user_sessions',
+    name: 'user_sessions',
+    position: { x: 100, y: 500 },
+    rowCount: 892340,
+    columns: [
+      { name: 'id', type: 'uuid', nullable: false, primaryKey: true, indexed: true },
+      { name: 'user_id', type: 'uuid', nullable: false, foreignKey: 'users.id', indexed: true },
+      { name: 'token', type: 'varchar(255)', nullable: false, indexed: true },
+      { name: 'created_at', type: 'timestamp', nullable: false, indexed: false },
+      { name: 'expires_at', type: 'timestamp', nullable: false, indexed: false },
+      { name: 'ip_address', type: 'varchar(45)', nullable: true, indexed: false },
+    ],
+  },
+];
+
+export const mockSuggestions: Suggestion[] = [
+  // Critical indexing issues
+  {
+    id: 'sug-1',
+    tableId: 'posts',
+    tableName: 'posts',
+    columnName: 'user_id',
+    severity: 'error',
+    type: 'not-indexed',
+    title: 'Missing critical foreign key index',
+    description: 'Foreign key "user_id" is not indexed on high-traffic table with 128K+ rows',
+    impact: 'JOINs on posts.user_id cause table scans. Add: CREATE INDEX idx_posts_user_id ON posts(user_id);',
+  },
+  {
+    id: 'sug-2',
+    tableId: 'comments',
+    tableName: 'comments',
+    columnName: 'post_id',
+    severity: 'error',
+    type: 'not-indexed',
+    title: 'Missing critical foreign key index',
+    description: 'Foreign key "post_id" is not indexed with 342K+ rows',
+    impact: 'Severe JOIN performance issues. Add: CREATE INDEX idx_comments_post_id ON comments(post_id);',
+  },
+  {
+    id: 'sug-3',
+    tableId: 'comments',
+    tableName: 'comments',
+    columnName: 'user_id',
+    severity: 'error',
+    type: 'not-indexed',
+    title: 'Missing foreign key index',
+    description: 'Foreign key "user_id" lacks index on 342K row table',
+    impact: 'Slow user comment lookups. Add: CREATE INDEX idx_comments_user_id ON comments(user_id);',
+  },
+  
+  // RLS and Security
+  {
+    id: 'sug-4',
+    tableId: 'users',
+    tableName: 'users',
+    severity: 'error',
+    type: 'optimization',
+    title: 'Enable Row Level Security (RLS)',
+    description: 'Table lacks RLS policies - critical for Supabase security model',
+    impact: 'Data exposure risk. Enable: ALTER TABLE users ENABLE ROW LEVEL SECURITY; and add policies.',
+  },
+  {
+    id: 'sug-5',
+    tableId: 'posts',
+    tableName: 'posts',
+    severity: 'error',
+    type: 'optimization',
+    title: 'Enable Row Level Security (RLS)',
+    description: 'No RLS policies detected on user-generated content table',
+    impact: 'Users can access any post. Enable RLS and add policy: (auth.uid() = user_id)',
+  },
+  {
+    id: 'sug-6',
+    tableId: 'comments',
+    tableName: 'comments',
+    severity: 'error',
+    type: 'optimization',
+    title: 'Enable Row Level Security (RLS)',
+    description: 'Missing RLS on comments table',
+    impact: 'Security vulnerability. Add RLS with proper user_id checks.',
+  },
+
+  // Composite indexes for common queries
+  {
+    id: 'sug-7',
+    tableId: 'posts',
+    tableName: 'posts',
+    columnName: 'status, created_at',
+    severity: 'warning',
+    type: 'optimization',
+    title: 'Add composite index for common query pattern',
+    description: 'Queries filtering by status + ordering by created_at are common',
+    impact: 'CREATE INDEX idx_posts_status_created ON posts(status, created_at DESC); improves feed queries by 80%',
+  },
+  {
+    id: 'sug-8',
+    tableId: 'comments',
+    tableName: 'comments',
+    columnName: 'post_id, created_at',
+    severity: 'warning',
+    type: 'optimization',
+    title: 'Composite index for post comments timeline',
+    description: 'Loading comments for a post ordered by time needs composite index',
+    impact: 'CREATE INDEX idx_comments_post_created ON comments(post_id, created_at); speeds up comment threads',
+  },
+
+  // Timestamp optimization
+  {
+    id: 'sug-9',
+    tableId: 'user_sessions',
+    tableName: 'user_sessions',
+    columnName: 'expires_at',
+    severity: 'warning',
+    type: 'optimization',
+    title: 'Index timestamp for session cleanup',
+    description: 'expires_at used in WHERE clauses for cleanup jobs without index',
+    impact: 'CREATE INDEX idx_sessions_expires ON user_sessions(expires_at); critical for background jobs',
+  },
+
+  // Unused columns
+  {
+    id: 'sug-10',
+    tableId: 'users',
+    tableName: 'users',
+    columnName: 'legacy_user_id',
+    severity: 'warning',
+    type: 'unused',
+    title: 'Unused column detected',
+    description: 'Column "legacy_user_id" hasn\'t been accessed in 620+ days',
+    impact: 'Wasting ~180KB. Consider archiving or dropping after data migration verification.',
+  },
+  {
+    id: 'sug-11',
+    tableId: 'comments',
+    tableName: 'comments',
+    columnName: 'spam_checked',
+    severity: 'info',
+    type: 'unused',
+    title: 'Potentially unused column',
+    description: 'Column "spam_checked" last accessed 502 days ago',
+    impact: 'May be deprecated feature. Consider removing if spam detection moved to external service.',
+  },
+
+  // JSONB optimization
+  {
+    id: 'sug-12',
+    tableId: 'users',
+    tableName: 'users',
+    columnName: 'profile_data',
+    severity: 'info',
+    type: 'optimization',
+    title: 'Consider GIN index for JSONB queries',
+    description: 'If querying inside profile_data JSONB, add GIN index',
+    impact: 'CREATE INDEX idx_users_profile_gin ON users USING GIN (profile_data); enables fast JSONB lookups',
+  },
+
+  // Supabase realtime
+  {
+    id: 'sug-13',
+    tableId: 'posts',
+    tableName: 'posts',
+    severity: 'info',
+    type: 'optimization',
+    title: 'Enable Realtime for live updates',
+    description: 'Consider enabling Supabase Realtime on posts table',
+    impact: 'ALTER PUBLICATION supabase_realtime ADD TABLE posts; enables live post updates in UI',
+  },
+  {
+    id: 'sug-14',
+    tableId: 'comments',
+    tableName: 'comments',
+    severity: 'info',
+    type: 'optimization',
+    title: 'Enable Realtime for live comments',
+    description: 'Realtime subscription would improve UX for comment threads',
+    impact: 'Users see new comments instantly without polling. Enable via Supabase dashboard.',
+  },
+
+  // Soft deletes pattern
+  {
+    id: 'sug-15',
+    tableId: 'posts',
+    tableName: 'posts',
+    severity: 'info',
+    type: 'optimization',
+    title: 'Consider soft delete pattern',
+    description: 'Add deleted_at timestamp for audit trail and recovery',
+    impact: 'ALTER TABLE posts ADD COLUMN deleted_at timestamptz; then filter WHERE deleted_at IS NULL',
+  },
+
+  // Partitioning for large tables
+  {
+    id: 'sug-16',
+    tableId: 'user_sessions',
+    tableName: 'user_sessions',
+    severity: 'warning',
+    type: 'optimization',
+    title: 'Consider table partitioning',
+    description: 'With 892K rows and growing, partition by created_at (monthly)',
+    impact: 'Improves query performance and enables faster data archiving. Partition on created_at ranges.',
+  },
+
+  // Connection pooling
+  {
+    id: 'sug-17',
+    tableId: 'users',
+    tableName: 'users',
+    severity: 'info',
+    type: 'optimization',
+    title: 'Use Supabase connection pooling',
+    description: 'Ensure using pooled connection string for serverless environments',
+    impact: 'Prevents "too many connections" errors. Use connection string with :6543 port in serverless functions.',
+  },
+
+  // Cascade deletes
+  {
+    id: 'sug-18',
+    tableId: 'posts',
+    tableName: 'posts',
+    severity: 'warning',
+    type: 'optimization',
+    title: 'Define CASCADE behavior on FK',
+    description: 'user_id foreign key should have ON DELETE CASCADE or SET NULL',
+    impact: 'Prevents orphaned records. Add: ALTER TABLE posts ADD CONSTRAINT fk_user CASCADE;',
+  },
+];

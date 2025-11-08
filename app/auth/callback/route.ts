@@ -12,21 +12,39 @@ export async function GET(request: NextRequest) {
 
   const supabase = await getServerClient();
 
-  if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({
-      type,
-      token_hash,
-    });
-    if (!error) {
+  try {
+    // Handle magic link / email verification via OTP
+    if (token_hash && type) {
+      const { error } = await supabase.auth.verifyOtp({
+        type,
+        token_hash,
+      });
+      
+      if (error) {
+        console.error('OTP verification error:', error);
+        redirect(`/auth/error?message=${encodeURIComponent(error.message)}`);
+      }
+      
       redirect(next);
     }
-  } else if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
+    
+    // Handle OAuth / PKCE flow
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      
+      if (error) {
+        console.error('Code exchange error:', error);
+        redirect(`/auth/error?message=${encodeURIComponent(error.message)}`);
+      }
+      
       redirect(next);
     }
-  }
 
-  redirect('/error');
+    // No valid authentication parameters
+    redirect('/auth/error?message=Invalid authentication link');
+  } catch (error) {
+    console.error('Auth callback error:', error);
+    redirect('/auth/error?message=An unexpected error occurred');
+  }
 }
 

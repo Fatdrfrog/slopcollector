@@ -2,11 +2,19 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getBrowserClient } from '@/lib/supabase/client';
+import type { Tables } from '@/lib/database.types';
+
+type ConnectedProjectRow = Pick<
+  Tables<'connected_projects'>,
+  'id' | 'project_name' | 'supabase_url' | 'is_active' | 'last_synced_at'
+>;
 
 export interface ProjectSummary {
   id: string;
-  display_name: string;
-  supabase_project_ref: string;
+  projectName: string;
+  supabaseUrl: string;
+  isActive: boolean;
+  lastSyncedAt?: string | null;
 }
 
 interface UseProjectsResult {
@@ -29,9 +37,9 @@ export function useProjects(): UseProjectsResult {
     setLoading(true);
 
     supabase
-      .from('projects')
-      .select('id, display_name, supabase_project_ref')
-      .order('created_at', { ascending: true })
+      .from('connected_projects')
+      .select('id, project_name, supabase_url, is_active, last_synced_at')
+      .order('created_at', { ascending: false })
       .then(({ data, error: queryError }) => {
         if (!mounted) return;
         if (queryError) {
@@ -42,11 +50,23 @@ export function useProjects(): UseProjectsResult {
           return;
         }
 
-        const projectData = (data ?? []) as ProjectSummary[];
+        setError(undefined);
+
+        const projectData = ((data ?? []) as ConnectedProjectRow[]).map((row) => ({
+          id: row.id,
+          projectName: row.project_name ?? 'Supabase Project',
+          supabaseUrl: row.supabase_url,
+          isActive: Boolean(row.is_active),
+          lastSyncedAt: row.last_synced_at ?? null,
+        }));
+
         setProjects(projectData);
+
         if (!activeProjectId && projectData.length > 0) {
-          setActiveProjectId(projectData[0].id);
+          const preferred = projectData.find((project) => project.isActive) ?? projectData[0];
+          setActiveProjectId(preferred.id);
         }
+
         setLoading(false);
       });
 

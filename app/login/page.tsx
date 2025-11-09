@@ -33,6 +33,36 @@ const supabaseConnectSchema = z.object({
 
 type SupabaseConnectFormValues = z.infer<typeof supabaseConnectSchema>;
 
+const normalizeSupabaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
+
+const capitalize = (value: string) =>
+  value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+
+const deriveProjectName = (url: string) => {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+
+    if (hostname === 'localhost') {
+      return 'Local Supabase';
+    }
+
+    const withoutKnownDomain = hostname.endsWith('.supabase.co')
+      ? hostname.slice(0, -'.supabase.co'.length)
+      : hostname;
+
+    const parts = withoutKnownDomain.split(/[-._]/).filter(Boolean);
+
+    if (parts.length === 0) {
+      return 'Supabase Project';
+    }
+
+    return parts.map(capitalize).join(' ');
+  } catch {
+    return 'Supabase Project';
+  }
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = useSupabaseClient();
@@ -52,34 +82,65 @@ export default function LoginPage() {
     setConnecting(true);
     setError(undefined);
 
+    const normalizedUrl = normalizeSupabaseUrl(values.supabaseUrl);
+    const supabaseKey = values.supabaseKey.trim();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
-      // Verify credentials by making a test API call
-      const testResponse = await fetch(`${values.supabaseUrl}/rest/v1/`, {
+      // Verify credentials by making a lightweight API call
+      const testResponse = await fetch(`${normalizedUrl}/rest/v1/`, {
         headers: {
-          'apikey': values.supabaseKey,
-          'Authorization': `Bearer ${values.supabaseKey}`,
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Accept': 'application/json',
+          'Cache-Control': 'no-store',
         },
+        signal: controller.signal,
       });
 
       if (!testResponse.ok) {
         throw new Error('Invalid Supabase credentials. Check your URL and API key.');
       }
 
+      authToasts.connectionSuccess();
+
       // Create anonymous session in our app
       const { data: { user }, error: signInError } = await supabase.auth.signInAnonymously();
 
-      if (signInError) throw signInError;
+      if (signInError) {
+        // Check if anonymous sign-in is disabled in SlopCollector's Supabase project
+        if (
+          signInError.message?.toLowerCase().includes('anonymous') ||
+          signInError.message?.toLowerCase().includes('signups not allowed') ||
+          signInError.status === 400
+        ) {
+          throw new Error(
+            'Anonymous sign-ins are disabled in SlopCollector\'s backend. This is a configuration issue with the SlopCollector app itself. Please contact support or check if anonymous authentication is enabled in the SlopCollector Supabase project.'
+          );
+        }
+        throw signInError;
+      }
 
       if (!user) throw new Error('Failed to create session');
+
+      const projectName = deriveProjectName(normalizedUrl);
+
+      const { error: deactivateError } = await supabase
+        .from('connected_projects')
+        .update({ is_active: false })
+        .eq('user_id', user.id);
+
+      if (deactivateError) throw deactivateError;
 
       // Store Supabase credentials in user profile
       const { error: profileError } = await supabase
         .from('connected_projects')
         .insert({
           user_id: user.id,
-          project_name: 'My Supabase Project',
-          supabase_url: values.supabaseUrl,
-          supabase_anon_key: values.supabaseKey,
+          project_name: projectName,
+          supabase_url: normalizedUrl,
+          supabase_anon_key: supabaseKey,
           is_active: true,
         });
 
@@ -89,10 +150,16 @@ export default function LoginPage() {
       authToasts.signInSuccess();
       setShowWelcome(true);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to connect to Supabase';
+      const errorMessage =
+        err instanceof DOMException && err.name === 'AbortError'
+          ? 'Connection timed out. Check your Supabase URL and key, then try again.'
+          : err instanceof Error
+          ? err.message
+          : 'Failed to connect to Supabase';
       authToasts.authError(errorMessage);
       setError(errorMessage);
     } finally {
+      clearTimeout(timeoutId);
       setConnecting(false);
     }
   };

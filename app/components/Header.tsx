@@ -58,7 +58,7 @@ export function Header({
               ) : (
                 projects.map((project) => (
                   <option key={project.id} value={project.id}>
-                    {project.display_name}
+                    {project.projectName}
                   </option>
                 ))
               )}

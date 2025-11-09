@@ -28,7 +28,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Project ID required' }, { status: 400 });
   }
 
-  const serviceClient = getServiceClient();
+  let serviceClient;
+  try {
+    serviceClient = getServiceClient();
+  } catch (error) {
+    console.error('Service client initialization failed:', error);
+    return NextResponse.json(
+      {
+        error: 'Server configuration error',
+        details: 'Service role key not configured. Contact administrator.',
+        hint: 'Check SUPABASE_SERVICE_ROLE_KEY environment variable',
+      },
+      { status: 500 }
+    );
+  }
 
   // Verify user owns this project
   const { data: project, error: projectError } = await serviceClient

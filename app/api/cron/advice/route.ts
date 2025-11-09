@@ -23,7 +23,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const serviceClient = getServiceClient();
+  let serviceClient;
+  try {
+    serviceClient = getServiceClient();
+  } catch (error) {
+    console.error('Service client initialization failed in CRON:', error);
+    return NextResponse.json(
+      {
+        error: 'Server configuration error',
+        details: 'Service role key not configured',
+        hint: 'Check SUPABASE_SERVICE_ROLE_KEY environment variable in Vercel',
+      },
+      { status: 500 }
+    );
+  }
   const startTime = Date.now();
   const results = {
     totalProjects: 0,

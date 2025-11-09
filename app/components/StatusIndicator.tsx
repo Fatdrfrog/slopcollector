@@ -38,7 +38,7 @@ export function StatusIndicator({ type, message, onDismiss }: StatusIndicatorPro
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className={`fixed top-20 right-6 z-50 ${bg} ${border} border rounded-lg px-4 py-3 font-mono text-sm shadow-lg max-w-md`}
+      className={`fixed bottom-20 right-6 z-50 ${bg} ${border} border rounded-lg px-4 py-3 font-mono text-sm shadow-lg max-w-md`}
     >
       <div className="flex items-center gap-3">
         <Icon className={`w-5 h-5 ${text} ${type === 'loading' ? 'animate-spin' : ''}`} />

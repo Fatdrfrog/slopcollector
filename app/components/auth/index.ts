@@ -5,5 +5,4 @@
 
 export { AuthLayout } from './AuthLayout';
 export { BrandHeader } from './BrandHeader';
-export { AuthFormSkeleton } from './AuthFormSkeleton';
 

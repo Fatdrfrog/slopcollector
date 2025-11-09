@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AuthLayout } from '@/app/components/auth/AuthLayout';
 import { BrandHeader } from '@/app/components/auth/BrandHeader';
@@ -9,6 +10,14 @@ import { AlertCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AuthErrorPage() {
+  return (
+    <Suspense fallback={<AuthErrorFallback />}>
+      <AuthErrorContent />
+    </Suspense>
+  );
+}
+
+function AuthErrorContent() {
   const searchParams = useSearchParams();
   const message = searchParams.get('message') || 'Connection failed';
 
@@ -32,6 +41,29 @@ export default function AuthErrorPage() {
           </Button>
         </Link>
         
+        <div className="text-xs text-[#666] text-center font-mono">
+          <p>Check your Supabase URL & API key</p>
+        </div>
+      </div>
+    </AuthLayout>
+  );
+}
+
+function AuthErrorFallback() {
+  return (
+    <AuthLayout>
+      <BrandHeader subtitle="Connection Error" />
+
+      <Alert variant="destructive" className="mb-6 bg-[#ff6b6b]/10 border-[#ff6b6b]">
+        <AlertCircle className="h-4 w-4 text-[#ff6b6b]" />
+        <AlertTitle className="text-[#ff6b6b] font-mono">Loading</AlertTitle>
+        <AlertDescription className="mt-2 text-[#ff6b6b] font-mono text-sm">
+          Retrieving error details&hellip;
+        </AlertDescription>
+      </Alert>
+
+      <div className="space-y-3">
+        <div className="w-full h-10 rounded bg-[#2a2a2a] border border-[#3a3a3a]" />
         <div className="text-xs text-[#666] text-center font-mono">
           <p>Check your Supabase URL & API key</p>
         </div>

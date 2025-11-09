@@ -1,5 +1,5 @@
 import { getOpenAIClient } from '../openai/client';
-import type { DatabaseSchemaSnapshot } from '../postgres/introspect';
+import type { DatabaseSchemaSnapshot, IndexSchema, TableSchema } from '../supabase/introspect';
 
 export interface GeneratedAdviceItem {
   severity: 'error' | 'warning' | 'info';
@@ -76,6 +76,53 @@ export async function generateAdviceFromSnapshot(
   return parsed;
 }
 
+type IndexSchemaWithDefinition = {
+  indexDefinition?: string | null;
+  definition?: string | null;
+};
+
+type TableSchemaWithSize = {
+  totalBytes?: number | null;
+  sizeBytes?: number | null;
+  total_bytes?: number | null;
+  table_bytes?: number | null;
+};
+
+function coerceNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function getIndexDefinition(index: IndexSchema & IndexSchemaWithDefinition): string | null {
+  return index.indexDefinition ?? index.definition ?? null;
+}
+
+function getTableTotalBytes(table: TableSchema & TableSchemaWithSize): number | null {
+  const candidates = [
+    table.totalBytes,
+    table.sizeBytes,
+    table.total_bytes,
+    table.table_bytes,
+  ];
+
+  for (const candidate of candidates) {
+    const coerced = coerceNumber(candidate);
+    if (coerced !== null) {
+      return coerced;
+    }
+  }
+
+  return null;
+}
+
 function summarizeSnapshot(snapshot: DatabaseSchemaSnapshot) {
   const columnsByTable = snapshot.columns.reduce<Record<string, typeof snapshot.columns>>(
     (acc, column) => {
@@ -120,14 +167,14 @@ function summarizeSnapshot(snapshot: DatabaseSchemaSnapshot) {
         unique: index.isUnique,
         primary: index.isPrimary,
         columns: index.columns,
-        definition: index.indexDefinition,
+        definition: getIndexDefinition(index as IndexSchema & IndexSchemaWithDefinition),
       }));
 
       return {
         schema: table.schema,
         table: table.tableName,
         rowEstimate: table.rowEstimate,
-        totalBytes: table.totalBytes,
+        totalBytes: getTableTotalBytes(table as TableSchema & TableSchemaWithSize),
         columns,
         indexes,
       };

@@ -4,7 +4,5 @@
  */
 
 export { useSupabaseClient } from './hooks';
-export { getUserProfile, getUserInitials, getUserDisplayName } from './userProfile';
-export { formatAuthError } from './utils';
 export { authToasts } from './toast';
 

@@ -16,6 +16,7 @@ interface DashboardData {
 type SchemaSnapshotRow = {
   id: string;
   tables_data: unknown;
+  columns_data: unknown;  // ADDED - needed for column information!
   indexes_data: unknown;
   relationships_data: unknown;
   created_at: string;
@@ -158,6 +159,16 @@ export function useDashboardData(projectId?: string): DashboardData {
         return;
       }
 
+      // Debug: Log what we actually got from database
+      console.log('📊 Schema Snapshot Data:', {
+        tables_count: Array.isArray(snapshot.tables_data) ? snapshot.tables_data.length : 0,
+        columns_count: Array.isArray(snapshot.columns_data) ? snapshot.columns_data.length : 0,
+        indexes_count: Array.isArray(snapshot.indexes_data) ? snapshot.indexes_data.length : 0,
+        has_columns_data: !!snapshot.columns_data,
+        snapshot_id: snapshot.id,
+        created_at: snapshot.created_at,
+      });
+
       // Build schema from stored data - ensure we pass columns!
       const schema: DatabaseSchemaSnapshot = {
         tables: (snapshot.tables_data as TableSchema[]) || [],
@@ -165,7 +176,24 @@ export function useDashboardData(projectId?: string): DashboardData {
         indexes: (snapshot.indexes_data as IndexSchema[]) || [],
       };
 
-      setTables(mapSnapshotToTables(schema));
+      // Debug: Log the schema we're mapping
+      console.log('🗂️ Mapping schema to tables:', {
+        tables: schema.tables.length,
+        columns: schema.columns.length,
+        indexes: schema.indexes.length,
+      });
+
+      const mappedTables = mapSnapshotToTables(schema);
+      console.log('✅ Mapped tables:', {
+        count: mappedTables.length,
+        sample: mappedTables[0] ? {
+          name: mappedTables[0].name,
+          columnCount: mappedTables[0].columns.length,
+          hasColumns: mappedTables[0].columns.length > 0,
+        } : null,
+      });
+
+      setTables(mappedTables);
 
       // Fetch suggestions for this project
       const suggestionItems = await fetchSuggestions(projectId);

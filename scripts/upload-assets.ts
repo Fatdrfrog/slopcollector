@@ -19,7 +19,7 @@ async function uploadAssets() {
     const bucketName = 'assets';
     const files = [
       { path: 'public/hi.mp4', storagePath: 'hi.mp4', contentType: 'video/mp4' },
-      { path: 'public/racoon.mp4', storagePath: 'racoon.mp4', contentType: 'video/mp4' },
+      { path: 'public/raccoon_2.mp4', storagePath: 'raccoon_2.mp4', contentType: 'video/mp4' },
     ];
 
     console.log('🚀 Starting asset upload to Supabase Storage...\n');

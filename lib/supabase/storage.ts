@@ -25,6 +25,6 @@ export function getStorageUrl(bucket: string, path: string): string {
  */
 export const videoUrls = {
   hi: () => getStorageUrl('assets', 'hi.mp4'),
-  racoon: () => getStorageUrl('assets', 'racoon.mp4'),
+  racoon: () => getStorageUrl('assets', 'raccoon_2.mp4'),
 };
 

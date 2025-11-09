@@ -45,8 +45,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Introspect the user's Supabase project
+    // Introspect using the clean library function
     console.log(`Introspecting project: ${project.project_name}`);
+    
     const schema = await introspectSupabaseProject(
       project.supabase_url,
       project.supabase_anon_key
@@ -54,12 +55,12 @@ export async function POST(request: Request) {
 
     if (!schema || schema.tables.length === 0) {
       return NextResponse.json(
-        { error: 'No tables found in project. Make sure your schema has tables in the public schema.' },
+        { error: 'No tables found. Make sure your Supabase project has tables in the public schema.' },
         { status: 400 }
       );
     }
 
-    console.log(`Found ${schema.tables.length} tables, ${schema.columns.length} columns, ${schema.indexes.length} indexes`);
+    console.log(`✅ Introspected: ${schema.tables.length} tables, ${schema.columns.length} columns`);
 
     // Store schema snapshot with columns
     const { data: snapshot, error: snapshotError } = await serviceClient
@@ -95,7 +96,13 @@ export async function POST(request: Request) {
       tables: schema.tables.length,
       columns: schema.columns.length,
       indexes: schema.indexes.length,
-      message: `Synced ${schema.tables.length} tables successfully`,
+      message: `Synced ${schema.tables.length} tables with ${schema.columns.length} columns`,
+      debug: {
+        tablesStored: schema.tables.length,
+        columnsStored: schema.columns.length,
+        sampleTable: schema.tables[0]?.tableName,
+        sampleColumns: schema.columns.slice(0, 3).map(c => `${c.tableName}.${c.columnName}`),
+      },
     });
   } catch (error) {
     console.error('Sync error:', error);

@@ -6,7 +6,7 @@ import type { Tables } from '@/lib/database.types';
 
 type ConnectedProjectRow = Pick<
   Tables<'connected_projects'>,
-  'id' | 'project_name' | 'supabase_url' | 'is_active' | 'last_synced_at'
+  'id' | 'project_name' | 'supabase_url' | 'is_active' | 'last_synced_at' | 'github_enabled' | 'github_repo_url'
 >;
 
 export interface ProjectSummary {
@@ -15,6 +15,8 @@ export interface ProjectSummary {
   supabaseUrl: string;
   isActive: boolean;
   lastSyncedAt?: string | null;
+  githubEnabled?: boolean;
+  githubRepoUrl?: string | null;
 }
 
 interface UseProjectsResult {
@@ -38,7 +40,7 @@ export function useProjects(): UseProjectsResult {
 
     supabase
       .from('connected_projects')
-      .select('id, project_name, supabase_url, is_active, last_synced_at')
+      .select('id, project_name, supabase_url, is_active, last_synced_at, github_enabled, github_repo_url')
       .order('created_at', { ascending: false })
       .then(({ data, error: queryError }) => {
         if (!mounted) return;
@@ -58,6 +60,8 @@ export function useProjects(): UseProjectsResult {
           supabaseUrl: row.supabase_url,
           isActive: Boolean(row.is_active),
           lastSyncedAt: row.last_synced_at ?? null,
+          githubEnabled: Boolean(row.github_enabled),
+          githubRepoUrl: row.github_repo_url ?? null,
         }));
 
         setProjects(projectData);

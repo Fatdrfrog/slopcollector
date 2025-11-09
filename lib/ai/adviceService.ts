@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { generateAdviceFromSnapshot } from './generateAdvice';
+import { generateAdviceFromSnapshot, type CodePatternContext } from './generateAdvice';
 import type { DatabaseSchemaSnapshot } from '../supabase/introspect';
 
 /**
@@ -37,9 +37,11 @@ export async function generateAIAdviceForProject(
     projectName?: string;
     skipRecentCheck?: boolean;
     cooldownHours?: number;
+    includeCodePatterns?: boolean;
   }
 ): Promise<GenerateAdviceResult> {
   const cooldownHours = options?.cooldownHours ?? 6;
+  const includeCodePatterns = options?.includeCodePatterns ?? true; // Default to true
 
   // Check if we've generated advice recently (unless skipped)
   if (!options?.skipRecentCheck) {
@@ -82,9 +84,31 @@ export async function generateAIAdviceForProject(
     indexes: (snapshot.indexes_data as any[]) || [],
   };
 
+  // Fetch code patterns if enabled
+  let codePatterns: CodePatternContext[] | undefined;
+  if (includeCodePatterns) {
+    const { data: patterns } = await serviceClient
+      .from('code_patterns')
+      .select('*')
+      .eq('project_id', projectId);
+
+    if (patterns && patterns.length > 0) {
+      codePatterns = patterns.map((p) => ({
+        tableName: p.table_name,
+        columnName: p.column_name || undefined,
+        patternType: p.pattern_type as 'query' | 'join' | 'filter' | 'sort',
+        filePath: p.file_path,
+        lineNumber: p.line_number || undefined,
+        frequency: p.frequency || 1,
+      }));
+      console.log(`📊 Found ${codePatterns.length} code patterns for context-aware advice`);
+    }
+  }
+
   // Generate AI suggestions using OpenAI
   const advice = await generateAdviceFromSnapshot(schemaSnapshot, {
     projectName: options?.projectName || 'Unnamed Project',
+    codePatterns,
   });
 
   // Convert to our format

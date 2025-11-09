@@ -43,10 +43,20 @@ export const GeneratedAdviceSchema = z.object({
 export type GeneratedAdviceItem = z.infer<typeof AdviceItemSchema>;
 export type GeneratedAdvice = z.infer<typeof GeneratedAdviceSchema>;
 
+export interface CodePatternContext {
+  tableName: string;
+  columnName?: string;
+  patternType: 'query' | 'join' | 'filter' | 'sort';
+  filePath: string;
+  lineNumber?: number;
+  frequency: number;
+}
+
 interface GenerateAdviceOptions {
   projectName?: string;
   temperature?: number;
   model?: string;
+  codePatterns?: CodePatternContext[];
 }
 
 const DEFAULT_MODEL = 'gpt-5';
@@ -60,7 +70,8 @@ const SYSTEM_PROMPT = `You are an elite PostgreSQL performance consultant specia
 
 ## Your Task
 Analyze the provided database schema with ALL its tables, columns, indexes, and foreign key relationships.
-Generate actionable optimization recommendations based on the COMPLETE schema structure.
+When code usage patterns are provided, PRIORITIZE optimizations for columns that are ACTUALLY USED in the codebase.
+Generate actionable optimization recommendations based on the COMPLETE schema structure and REAL query patterns.
 
 ## Output Requirements
 Return a JSON object with this EXACT structure:
@@ -105,25 +116,38 @@ Return a JSON object with this EXACT structure:
 - **normalization**: Denormalization opportunity or over-normalization issue
 
 ## Focus Areas
-1. **Missing Indexes** (Priority 1)
+1. **Code-Driven Optimizations** (Priority 1 - when code patterns provided)
+   - Columns used in WHERE clauses (filter patterns) without indexes
+   - Columns used in ORDER BY (sort patterns) without indexes
+   - Columns used in JOINs (join patterns) without indexes
+   - High-frequency query patterns (frequency > 5) need immediate indexing
+
+2. **Missing Indexes** (Priority 2)
    - Foreign key columns without indexes (CHECK foreignKeyTo field!)
    - Timestamp columns (created_at, updated_at) in large tables
    - Status/type enum columns
    - Columns in WHERE clauses
 
-2. **Performance Bottlenecks** (Priority 2)
+3. **Performance Bottlenecks** (Priority 3)
    - N+1 query patterns from unindexed FKs (use foreignKeys array!)
    - Full table scans on large tables
    - Inefficient JOIN operations
    - Missing composite indexes for common query patterns
 
-3. **Security** (Priority 3)
+4. **Security** (Priority 4)
    - Public tables without RLS policies
    - Missing FK constraints (check isPrimaryKey and foreignKeyTo fields)
 
-4. **Best Practices** (Priority 4)
+5. **Best Practices** (Priority 5)
    - Dead columns consuming storage
    - Opportunities for composite indexes based on relationships
+
+## Code Pattern Context
+When code usage patterns are provided, you will see:
+- Which columns are ACTUALLY filtered/sorted/joined in the codebase
+- How frequently each pattern occurs
+- File paths showing WHERE the queries are used
+Use this to prioritize suggestions for columns with PROVEN high usage.
 
 ## Examples
 
@@ -181,6 +205,23 @@ export async function generateAdviceFromSnapshot(
 
   console.log(`🤖 Calling OpenAI API with model: ${model}`);
 
+  // Build code patterns context if provided
+  let codeContext = '';
+  if (options.codePatterns && options.codePatterns.length > 0) {
+    const patterns = options.codePatterns
+      .sort((a, b) => b.frequency - a.frequency) // Sort by frequency (highest first)
+      .slice(0, 100) // Limit to top 100 patterns
+      .map((p) => 
+        `  - ${p.tableName}.${p.columnName || '*'} used in ${p.patternType.toUpperCase()} at ${p.filePath}${p.lineNumber ? `:${p.lineNumber}` : ''} (${p.frequency}x)`
+      )
+      .join('\n');
+
+    codeContext = `\n\nActual Codebase Query Patterns (PRIORITIZE THESE):
+${patterns}
+
+** IMPORTANT: Focus on indexing columns with high frequency usage (5+) in filter/sort/join patterns **`;
+  }
+
   const userPrompt = `Project: ${options.projectName ?? 'Supabase Project'}
 
 Database Schema Analysis:
@@ -192,15 +233,19 @@ IMPORTANT Context:
   * columns[] with isPrimaryKey and foreignKeyTo fields  
   * indexes[] with existing indexes
   * foreignKeys[] showing relationships
-  * rowEstimate and totalBytes for size context
+  * rowEstimate and totalBytes for size context${codeContext}
 
 Critical Analysis Focus:
-1. Foreign key columns WITHOUT indexes (check: foreignKeyTo field present but indexed=false)
+${options.codePatterns && options.codePatterns.length > 0 ? `1. HIGH PRIORITY: Columns with proven usage in codebase (see patterns above) lacking indexes
+2. Foreign key columns WITHOUT indexes (check: foreignKeyTo field present but indexed=false)
+3. Large tables (high rowEstimate) without proper indexes on frequently accessed columns
+4. Missing composite indexes for common query patterns from codebase
+5. Tables without RLS policies (security risk)` : `1. Foreign key columns WITHOUT indexes (check: foreignKeyTo field present but indexed=false)
 2. Large tables (high rowEstimate) without proper indexes on filtered columns
 3. Missing composite indexes for common query patterns
-4. Tables without RLS policies (security risk)
+4. Tables without RLS policies (security risk)`}
 
-Provide actionable, high-impact optimization recommendations.`;
+Provide actionable, high-impact optimization recommendations${options.codePatterns && options.codePatterns.length > 0 ? ', prioritizing columns with proven usage in the codebase' : ''}.`;
 
   // GPT-5 reasoning token management
   // GPT-5 "thinks" internally before responding, consuming tokens for reasoning

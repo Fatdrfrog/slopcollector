@@ -1,5 +1,8 @@
-import { Database, RefreshCcw } from 'lucide-react';
+import { useState } from 'react';
+import { Database, RefreshCcw, Github } from 'lucide-react';
 import type { ProjectSummary } from '../hooks/useProjects';
+import { GitHubConnectDialog } from './GitHubConnectDialog';
+import { AnimatePresence } from 'motion/react';
 
 interface HeaderProps {
   tableCount: number;
@@ -35,7 +38,11 @@ export function Header({
   onGenerateAdvice,
   isGeneratingAdvice,
 }: HeaderProps) {
+  const [showGitHubDialog, setShowGitHubDialog] = useState(false);
+  const activeProject = projects.find((p) => p.id === activeProjectId);
+
   return (
+    <>
     <header className="h-14 border-b border-gray-800 bg-[#1a1a1a] flex items-center justify-between px-4">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3">
@@ -63,6 +70,20 @@ export function Header({
                 ))
               )}
             </select>
+            {activeProject?.githubEnabled ? (
+              <div className="flex items-center gap-1 px-2 py-1 text-xs bg-[#7ed321]/10 border border-[#7ed321]/30 text-[#7ed321] rounded-md">
+                <Github className="w-3 h-3" />
+                <span>GitHub</span>
+              </div>
+            ) : activeProjectId ? (
+              <button
+                onClick={() => setShowGitHubDialog(true)}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-[#2a2a2a] border border-[#3a3a3a] text-[#999] hover:text-white hover:border-[#7ed321]/30 rounded-md transition-colors"
+              >
+                <Github className="w-3 h-3" />
+                <span>Connect</span>
+              </button>
+            ) : null}
           </div>
 
           <button
@@ -134,5 +155,21 @@ export function Header({
         </button>
       </div>
     </header>
+
+    {/* GitHub Connect Dialog */}
+    <AnimatePresence>
+      {showGitHubDialog && activeProject && (
+        <GitHubConnectDialog
+          projectId={activeProject.id}
+          projectName={activeProject.projectName}
+          onClose={() => setShowGitHubDialog(false)}
+          onSuccess={() => {
+            // Refresh to update GitHub status
+            onRefresh();
+          }}
+        />
+      )}
+    </AnimatePresence>
+    </>
   );
 }

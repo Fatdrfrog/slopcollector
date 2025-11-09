@@ -24,6 +24,13 @@ export interface Table {
 
 export type SuggestionSeverity = 'warning' | 'info' | 'error';
 
+export interface CodeReference {
+  filePath: string;
+  lineNumber?: number;
+  patternType: 'query' | 'join' | 'filter' | 'sort';
+  frequency: number;
+}
+
 export interface Suggestion {
   id: string;
   tableId: string;
@@ -34,4 +41,5 @@ export interface Suggestion {
   title: string;
   description: string;
   impact?: string;
+  codeReferences?: CodeReference[];
 }

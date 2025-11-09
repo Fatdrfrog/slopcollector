@@ -1,4 +1,4 @@
-import { AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { AlertCircle, Info, AlertTriangle, Code, FileCode } from 'lucide-react';
 import type { Suggestion } from '../types';
 
 interface SuggestionCardProps {
@@ -71,9 +71,38 @@ export function SuggestionCard({ suggestion, onSelectTable }: SuggestionCardProp
         {suggestion.description}
       </p>
       
+      {/* Code References */}
+      {suggestion.codeReferences && suggestion.codeReferences.length > 0 && (
+        <div className="mt-2.5 pt-2.5 border-t border-gray-800/50">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Code className="w-3 h-3 text-[#7ed321]" />
+            <span className="text-xs font-bold text-[#7ed321]">Used in codebase</span>
+          </div>
+          <div className="space-y-1">
+            {suggestion.codeReferences.slice(0, 2).map((ref, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-xs text-[#999]">
+                <FileCode className="w-3 h-3 text-[#4ecdc4]" />
+                <code className="flex-1 truncate font-mono text-[#ccc]">
+                  {ref.filePath}
+                  {ref.lineNumber && `:${ref.lineNumber}`}
+                </code>
+                <span className="text-[#7ed321] font-bold flex-shrink-0">
+                  {ref.frequency}x
+                </span>
+              </div>
+            ))}
+            {suggestion.codeReferences.length > 2 && (
+              <div className="text-xs text-[#666] italic pl-5">
+                +{suggestion.codeReferences.length - 2} more locations
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Impact/Action */}
       {suggestion.impact && (
-        <div className="flex items-start gap-2 text-xs text-gray-400 bg-[#0f0f0f]/80 px-3 py-2 rounded-lg font-mono border border-gray-800/50 group-hover:border-gray-700/80 transition-colors">
+        <div className="flex items-start gap-2 text-xs text-gray-400 bg-[#0f0f0f]/80 px-3 py-2 rounded-lg font-mono border border-gray-800/50 group-hover:border-gray-700/80 transition-colors mt-2.5">
           <span className="text-indigo-500 opacity-60 flex-shrink-0">$</span>
           <span className="flex-1 leading-relaxed">{suggestion.impact}</span>
         </div>

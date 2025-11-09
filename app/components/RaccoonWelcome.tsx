@@ -2,7 +2,6 @@
 
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { getAssetUrl, ASSETS } from '@/lib/supabase/assets';
 
 /**
  * Raccoon Welcome Animation
@@ -44,10 +43,17 @@ export function RaccoonWelcome({ onComplete }: { onComplete: () => void }) {
           autoPlay
           muted
           playsInline
+          preload="auto"
           onEnded={handleVideoEnd}
+          onError={(e) => {
+            console.error('Hi video failed to load:', e);
+            // Fallback - just complete
+            handleVideoEnd();
+          }}
           className="w-full h-auto rounded-lg"
         >
-          <source src={getAssetUrl(ASSETS.HI_VIDEO)} type="video/mp4" />
+          <source src="/hi.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
         </video>
         <motion.p
           className="text-center text-[#7ed321] font-mono text-lg mt-6"

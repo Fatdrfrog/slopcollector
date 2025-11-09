@@ -21,7 +21,6 @@ import {
 } from '@/app/components/ui/form';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { Loader2, Database, Search, BarChart3, Code2, ExternalLink } from 'lucide-react';
-import { getAssetUrl, ASSETS } from '@/lib/supabase/assets';
 
 // Supabase credentials authentication
 const supabaseConnectSchema = z.object({
@@ -144,9 +143,15 @@ export default function LoginPage() {
                 loop
                 muted
                 playsInline
+                preload="auto"
                 className="w-full h-auto"
+                onError={(e) => {
+                  console.error('Raccoon video failed to load:', e);
+                  console.log('Video path: /racoon.mp4');
+                }}
               >
-                <source src={getAssetUrl(ASSETS.RACCOON_VIDEO)}  type="video/mp4" />
+                <source src="/racoon.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
               </video>
             </motion.div>
 

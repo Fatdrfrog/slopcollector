@@ -87,12 +87,96 @@ export async function POST(request: Request) {
     );
   }
 
-  // TODO: Implement AI advice generation
-  // For now, return job created
-  return NextResponse.json({
-    jobId: job.id,
-    status: 'pending',
-    message: 'AI advice generation will be implemented soon',
+  // Generate AI advice in background
+  // For now, we'll do it synchronously, but could move to edge function or queue
+  try {
+    await generateAIAdvice(serviceClient, project.id, job.id);
+    
+    return NextResponse.json({
+      jobId: job.id,
+      status: 'completed',
+      message: 'AI advice generated successfully',
+    });
+  } catch (adviceError) {
+    console.error('AI advice generation error:', adviceError);
+    
+    // Update job status to failed
+    await serviceClient
+      .from('analysis_jobs')
+      .update({
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        error_message: adviceError instanceof Error ? adviceError.message : 'Unknown error',
+      })
+      .eq('id', job.id);
+    
+    return NextResponse.json(
+      {
+        error: 'Failed to generate AI advice',
+        details: adviceError instanceof Error ? adviceError.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Generate AI-powered index suggestions using OpenAI
+ */
+async function generateAIAdvice(
+  serviceClient: SupabaseClient,
+  projectId: string,
+  jobId: string
+) {
+  const { generateAdviceForSchema } = await import('@/lib/ai/generateAdvice');
+  
+  // Get latest schema snapshot
+  const { data: snapshot } = await serviceClient
+    .from('schema_snapshots')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!snapshot) {
+    throw new Error('No schema snapshot found. Please sync your project first.');
+  }
+
+  // Generate AI suggestions
+  const suggestions = await generateAdviceForSchema({
+    tables: snapshot.tables_data as any[],
+    indexes: snapshot.indexes_data as any[],
   });
+
+  // Store suggestions in database
+  const suggestionRows = suggestions.map(s => ({
+    project_id: projectId,
+    table_name: s.tableName,
+    column_name: s.columnName || null,
+    severity: s.severity,
+    suggestion_type: s.type,
+    title: s.title,
+    description: s.description,
+    sql_snippet: s.sqlSnippet || null,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+  }));
+
+  if (suggestionRows.length > 0) {
+    await serviceClient
+      .from('optimization_suggestions')
+      .insert(suggestionRows);
+  }
+
+  // Update job status
+  await serviceClient
+    .from('analysis_jobs')
+    .update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      result: { suggestions: suggestions.length },
+    })
+    .eq('id', jobId);
 }
 

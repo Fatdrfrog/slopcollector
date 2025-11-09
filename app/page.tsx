@@ -6,12 +6,12 @@ import { Header } from './components/Header';
 import { ERDCanvas } from './components/ERDCanvas';
 import { SuggestionsPanel } from './components/SuggestionsPanel';
 import { CommandPalette } from './components/CommandPalette';
+import { EmptyState } from './components/EmptyState';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTableNavigation } from './hooks/useTableNavigation';
 import { useDashboardData } from './hooks/useDashboardData';
 import { useProjects } from './hooks/useProjects';
 import { useSupabaseSession } from './hooks/useSupabaseSession';
-import { mockTables, mockSuggestions } from './data/mockData';
 import { getBrowserClient } from '@/lib/supabase/client';
 
 /**
@@ -43,15 +43,9 @@ export default function Home() {
   const [isGeneratingAdvice, setIsGeneratingAdvice] = useState(false);
   const [adviceError, setAdviceError] = useState<string>();
 
-  const tables = useMemo(
-    () => (remoteTables.length > 0 ? remoteTables : mockTables),
-    [remoteTables]
-  );
-
-  const suggestions = useMemo(
-    () => (remoteSuggestions.length > 0 ? remoteSuggestions : mockSuggestions),
-    [remoteSuggestions]
-  );
+  // Only show real data - no mock data fallback
+  const tables = useMemo(() => remoteTables, [remoteTables]);
+  const suggestions = useMemo(() => remoteSuggestions, [remoteSuggestions]);
 
   useEffect(() => {
     if (remoteTables.length > 0) {
@@ -65,23 +59,37 @@ export default function Home() {
     }
   }, [user, isConnected]);
 
-  // Show loading state while checking auth
-  if (authLoading || (!user && !isConnected)) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#0f0f0f]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   const handleSignOut = useCallback(async () => {
     await supabaseClient.auth.signOut();
     setIsConnected(false);
     setAdviceError(undefined);
   }, [supabaseClient]);
+
+  const handleSync = useCallback(async () => {
+    if (!activeProjectId) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/internal/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: activeProjectId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? response.statusText);
+      }
+
+      // Refresh to get the new schema
+      await refresh();
+    } catch (err) {
+      setAdviceError(
+        err instanceof Error ? err.message : 'Failed to sync schema.'
+      );
+    }
+  }, [activeProjectId, refresh]);
 
   const handleGenerateAdvice = useCallback(async () => {
     if (!activeProjectId) {
@@ -114,6 +122,14 @@ export default function Home() {
     }
   }, [activeProjectId, refresh]);
 
+  // Auto-sync when project changes and no data yet
+  useEffect(() => {
+    if (activeProjectId && remoteTables.length === 0 && !loading) {
+      void handleSync();
+    }
+  }, [activeProjectId, remoteTables.length, loading, handleSync]);
+
+
   // Table navigation handlers
   const { selectTable, selectNextTable, clearSelection } = useTableNavigation(
     tables,
@@ -143,6 +159,19 @@ export default function Home() {
     }
   }, [authLoading, user, isConnected, router]);
 
+    // Show loading state while checking auth
+    if (authLoading || (!user && !isConnected)) {
+      return (
+        <div className="h-screen w-screen flex items-center justify-center bg-[#0f0f0f]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+
+    
   return (
     <div className="h-screen w-screen flex flex-col bg-[#0f0f0f]">
       {/* Header */}
@@ -154,7 +183,7 @@ export default function Home() {
         projects={projects}
         activeProjectId={activeProjectId}
         onProjectChange={(projectId) => setActiveProjectId(projectId)}
-        onRefresh={refresh}
+        onRefresh={handleSync}
         isSyncing={loading}
         userEmail={user?.email}
         onSignOut={handleSignOut}
@@ -174,27 +203,33 @@ export default function Home() {
             ? 'Checking authentication…'
             : projectsLoading
             ? 'Loading Supabase projects…'
-            : 'Syncing latest schema insights…'}
+            : 'Syncing your database schema from Supabase…'}
         </div>
       )}
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Canvas */}
-        <div className="flex-1 relative">
-          <ERDCanvas
-            tables={tables}
-            selectedTable={selectedTable}
-            onTableSelect={selectTable}
-          />
-        </div>
+        {tables.length === 0 ? (
+          <EmptyState onSync={handleSync} isSyncing={loading} />
+        ) : (
+          <>
+            {/* Canvas */}
+            <div className="flex-1 relative">
+              <ERDCanvas
+                tables={tables}
+                selectedTable={selectedTable}
+                onTableSelect={selectTable}
+              />
+            </div>
 
-        {/* Suggestions Panel */}
-        {showSuggestions && (
-          <SuggestionsPanel
-            suggestions={suggestions}
-            selectedTable={selectedTableData}
-          />
+            {/* Suggestions Panel */}
+            {showSuggestions && (
+              <SuggestionsPanel
+                suggestions={suggestions}
+                selectedTable={selectedTableData}
+              />
+            )}
+          </>
         )}
       </div>
 

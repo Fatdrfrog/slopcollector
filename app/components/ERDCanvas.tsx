@@ -3,6 +3,7 @@ import {
   ReactFlow,
   Background,
   MiniMap,
+  Controls,
   useNodesState,
   useEdgesState,
   BackgroundVariant,
@@ -23,11 +24,7 @@ interface ERDCanvasProps {
   onTableSelect: (id: string | null) => void;
 }
 
-/**
- * Main canvas component for the ERD diagram using React Flow
- */
 export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasProps) {
-  // Generate nodes and edges from tables
   const initialNodes = useMemo(
     () => generateNodesFromTables(tables, selectedTable, onTableSelect),
     [tables, selectedTable, onTableSelect]
@@ -41,7 +38,6 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(initialNodes);
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
-  // Update nodes when selection changes
   useEffect(() => {
     setNodes((nds) =>
       nds.map((node) => {
@@ -60,7 +56,6 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
     );
   }, [selectedTable, setNodes]);
 
-  // Define custom node types
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       tableNode: TableNode,
@@ -68,12 +63,10 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
     []
   );
 
-  // Handle clicking on empty canvas
   const handlePaneClick = useCallback(() => {
     onTableSelect(null);
   }, [onTableSelect]);
 
-  // Mini-map node coloring based on status
   const getMiniMapNodeColor = useCallback((node: Node<TableNodeData>) => {
     if (!node.data) {
       return '#404040';
@@ -84,6 +77,7 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
 
     if (isSelected) return '#6366f1';
     if (hasIssues) return '#f59e0b';
+
     return '#404040';
   }, []);
 
@@ -109,11 +103,19 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
           style={{ backgroundColor: '#0f0f0f' }}
         />
         
+        <Controls 
+          className="bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg shadow-lg"
+          position="bottom-left"
+          showInteractive={false}
+        />
+        
         <MiniMap
           nodeColor={getMiniMapNodeColor}
-          className="bg-[#1a1a1a] border border-gray-800 rounded-lg shadow-lg"
+          className="bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg shadow-lg"
           maskColor="rgb(15, 15, 15, 0.7)"
           position="bottom-right"
+          pannable
+          zoomable
         />
       </ReactFlow>
 

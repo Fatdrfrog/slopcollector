@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
+import { videoUrls } from '@/lib/supabase/storage';
 
 /**
  * Raccoon Welcome Animation
@@ -52,7 +53,7 @@ export function RaccoonWelcome({ onComplete }: { onComplete: () => void }) {
           }}
           className="w-full h-auto rounded-lg"
         >
-          <source src="/hi.mp4" type="video/mp4" />
+          <source src={videoUrls.hi()} type="video/mp4" />
           Your browser does not support the video tag.
         </video>
         <motion.p

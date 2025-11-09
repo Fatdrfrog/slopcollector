@@ -12,4 +12,5 @@ export { getServerClient } from './server';
 export { getServiceClient } from './serviceClient';
 export { updateSession } from './middleware';
 export { getSupabaseConfig, getSupabaseServiceConfig } from './config';
+export { getStorageUrl, videoUrls } from './storage';
 

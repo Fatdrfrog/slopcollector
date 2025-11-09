@@ -1,21 +1,46 @@
 import { getOpenAIClient } from '../openai/client';
+import { z } from 'zod';
 import type { DatabaseSchemaSnapshot, IndexSchema, TableSchema } from '../supabase/introspect';
 
-export interface GeneratedAdviceItem {
-  severity: 'error' | 'warning' | 'info';
-  category: string;
-  table?: string;
-  column?: string;
-  headline: string;
-  description: string;
-  remediation?: string;
-  metadata?: Record<string, unknown>;
-}
+/**
+ * Zod schema for strict validation of AI-generated advice
+ * Ensures reliable, type-safe JSON structure
+ */
+export const AdviceItemSchema = z.object({
+  severity: z.enum(['error', 'warning', 'info']).describe('Criticality level of the issue'),
+  category: z.enum([
+    'missing_index',
+    'composite_index', 
+    'unused_index',
+    'slow_query',
+    'unused_column',
+    'rls_policy',
+    'foreign_key',
+    'data_type',
+    'normalization',
+  ]).describe('Type of optimization'),
+  table: z.string().describe('Affected table name'),
+  column: z.string().optional().describe('Affected column name if applicable'),
+  headline: z.string().min(10).max(100).describe('Short, actionable title (10-100 chars)'),
+  description: z.string().min(20).max(500).describe('Detailed explanation with performance impact (20-500 chars)'),
+  remediation: z.string().optional().describe('SQL statement to fix the issue'),
+  estimatedImpact: z.enum(['high', 'medium', 'low']).optional().describe('Expected performance improvement'),
+  affectedQueries: z.array(z.string()).optional().describe('Common query patterns affected'),
+});
 
-export interface GeneratedAdvice {
-  summary: string;
-  advisories: GeneratedAdviceItem[];
-}
+export const GeneratedAdviceSchema = z.object({
+  summary: z.string().min(20).max(300).describe('Overall schema health summary (20-300 chars)'),
+  advisories: z.array(AdviceItemSchema).min(0).max(50).describe('List of optimization suggestions'),
+  stats: z.object({
+    totalIssues: z.number().int().min(0),
+    criticalIssues: z.number().int().min(0),
+    warningIssues: z.number().int().min(0),
+    infoIssues: z.number().int().min(0),
+  }).optional().describe('Issue statistics'),
+});
+
+export type GeneratedAdviceItem = z.infer<typeof AdviceItemSchema>;
+export type GeneratedAdvice = z.infer<typeof GeneratedAdviceSchema>;
 
 interface GenerateAdviceOptions {
   projectName?: string;
@@ -23,7 +48,124 @@ interface GenerateAdviceOptions {
   model?: string;
 }
 
-const DEFAULT_MODEL = 'gpt-4o-mini';
+const DEFAULT_MODEL = 'gpt-4o';
+
+const SYSTEM_PROMPT = `You are an elite PostgreSQL performance consultant specializing in Supabase database optimization. Your expertise includes:
+- Index strategy and query optimization
+- Data modeling and normalization
+- Row Level Security (RLS) policies
+- Foreign key relationships and referential integrity
+- Storage and performance tuning
+
+## Your Task
+Analyze the provided database schema and generate actionable optimization recommendations.
+
+## Output Requirements
+Return a JSON object with this EXACT structure:
+
+{
+  "summary": "Brief overall assessment (20-300 chars)",
+  "advisories": [
+    {
+      "severity": "error|warning|info",
+      "category": "missing_index|composite_index|unused_index|slow_query|unused_column|rls_policy|foreign_key|data_type|normalization",
+      "table": "table_name",
+      "column": "column_name (optional)",
+      "headline": "Action-oriented title (10-100 chars)",
+      "description": "Detailed impact explanation (20-500 chars)",
+      "remediation": "CREATE INDEX ... SQL (optional)",
+      "estimatedImpact": "high|medium|low (optional)",
+      "affectedQueries": ["Common query patterns (optional)"]
+    }
+  ],
+  "stats": {
+    "totalIssues": 5,
+    "criticalIssues": 2,
+    "warningIssues": 2,
+    "infoIssues": 1
+  }
+}
+
+## Severity Guidelines
+- **error**: Critical performance issues (missing FK indexes, no RLS on public tables, N+1 query patterns)
+- **warning**: Moderate issues (suboptimal indexes, missing composite indexes, unused columns)
+- **info**: Best practice recommendations (consider partitioning, archive old data)
+
+## Category Guidelines
+- **missing_index**: Foreign key or frequently filtered column lacks index
+- **composite_index**: Multiple columns often queried together need composite index
+- **unused_index**: Index exists but rarely/never used (check pg_stat_user_indexes)
+- **slow_query**: Query pattern detected that will perform poorly at scale
+- **unused_column**: Column rarely accessed, consider removal or archival
+- **rls_policy**: Missing or misconfigured Row Level Security
+- **foreign_key**: Missing FK constraint or index on FK column
+- **data_type**: Inefficient data type choice (text instead of varchar, etc)
+- **normalization**: Denormalization opportunity or over-normalization issue
+
+## Focus Areas
+1. **Missing Indexes** (Priority 1)
+   - Foreign key columns without indexes
+   - Timestamp columns (created_at, updated_at) in large tables
+   - Status/type enum columns
+   - Columns in WHERE clauses
+
+2. **Performance Bottlenecks** (Priority 2)
+   - N+1 query patterns from unindexed FKs
+   - Full table scans on large tables
+   - Inefficient JOIN operations
+
+3. **Security** (Priority 3)
+   - Public tables without RLS policies
+   - Missing FK constraints
+
+4. **Best Practices** (Priority 4)
+   - Dead columns consuming storage
+   - Opportunities for composite indexes
+
+## Examples
+
+Example 1 - Missing FK Index:
+{
+  "severity": "error",
+  "category": "missing_index",
+  "table": "posts",
+  "column": "user_id",
+  "headline": "Add index on posts.user_id foreign key",
+  "description": "Foreign key posts.user_id lacks an index. Queries like 'SELECT * FROM posts WHERE user_id = ?' will perform full table scans. With 128K rows, this causes ~500ms query times that will worsen as data grows.",
+  "remediation": "CREATE INDEX idx_posts_user_id ON posts(user_id);",
+  "estimatedImpact": "high",
+  "affectedQueries": ["SELECT * FROM posts WHERE user_id = ?", "JOIN posts ON users.id = posts.user_id"]
+}
+
+Example 2 - Composite Index Opportunity:
+{
+  "severity": "warning",
+  "category": "composite_index",
+  "table": "orders",
+  "headline": "Create composite index on orders(user_id, created_at)",
+  "description": "Queries filtering by user_id and sorting by created_at would benefit from a composite index. Current setup requires separate index scans.",
+  "remediation": "CREATE INDEX idx_orders_user_created ON orders(user_id, created_at DESC);",
+  "estimatedImpact": "medium",
+  "affectedQueries": ["SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC"]
+}
+
+Example 3 - Missing RLS:
+{
+  "severity": "error",
+  "category": "rls_policy",
+  "table": "user_profiles",
+  "headline": "Enable RLS on user_profiles table",
+  "description": "Table user_profiles is publicly accessible via Supabase API but has no Row Level Security. Users can read/modify any profile.",
+  "remediation": "ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;\\nCREATE POLICY user_profiles_select ON user_profiles FOR SELECT USING (auth.uid() = user_id);",
+  "estimatedImpact": "high"
+}
+
+## Important
+- Be specific with table/column names
+- Provide actual SQL in remediation
+- Prioritize issues by real performance impact
+- Focus on top 5-10 most critical issues
+- Skip minor optimizations in small tables (<1000 rows)`;
 
 export async function generateAdviceFromSnapshot(
   snapshot: DatabaseSchemaSnapshot,
@@ -31,30 +173,25 @@ export async function generateAdviceFromSnapshot(
 ): Promise<GeneratedAdvice> {
   const openai = getOpenAIClient();
   const model = options.model ?? DEFAULT_MODEL;
-  const temperature = options.temperature ?? 0.2;
+  const temperature = options.temperature ?? 0.3; // Slightly higher for creative suggestions
   const payload = summarizeSnapshot(snapshot);
 
-  const messages: Array<{ role: 'system' | 'user'; content: string }> = [
-    {
-      role: 'system',
-      content:
-        'You are Supabase Postgres performance expert. Analyse schema data and return JSON with actionable advice. Use severity levels error/warning/info and categories such as missing_index, optimization, unused, security.',
-    },
-    {
-      role: 'user',
-      content: JSON.stringify({
-        project: options.projectName ?? 'Supabase Project',
-        schema: payload,
-      }),
-    },
-  ];
+  const userPrompt = `Project: ${options.projectName ?? 'Supabase Project'}
+
+Database Schema Analysis:
+${JSON.stringify(payload, null, 2)}
+
+Analyze this schema and provide optimization recommendations following the exact JSON structure specified. Focus on high-impact issues first.`;
 
   const response = await openai.chat.completions.create({
     model,
     temperature,
     response_format: { type: 'json_object' },
-    messages,
-    max_tokens: 800,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    max_tokens: 2000, // Increased for detailed recommendations
   });
 
   const content = response.choices[0]?.message?.content;
@@ -62,18 +199,32 @@ export async function generateAdviceFromSnapshot(
     throw new Error('Empty response from OpenAI');
   }
 
-  let parsed: GeneratedAdvice;
+  // Parse and validate with Zod
+  let rawParsed: unknown;
   try {
-    parsed = JSON.parse(content) as GeneratedAdvice;
+    rawParsed = JSON.parse(content);
   } catch (error) {
-    throw new Error(`Failed to parse OpenAI response: ${(error as Error).message}`);
+    throw new Error(`Failed to parse JSON: ${(error as Error).message}`);
   }
 
-  if (!parsed.advisories) {
-    parsed.advisories = [];
+  // Validate against schema
+  const validationResult = GeneratedAdviceSchema.safeParse(rawParsed);
+  
+  if (!validationResult.success) {
+    console.error('Zod validation failed:', validationResult.error);
+    
+    // Fallback: Try to salvage what we can
+    const fallback = rawParsed as any;
+    return {
+      summary: fallback?.summary || 'Schema analysis completed',
+      advisories: Array.isArray(fallback?.advisories) 
+        ? fallback.advisories.filter((item: any) => item?.table && item?.headline)
+        : [],
+      stats: fallback?.stats,
+    };
   }
 
-  return parsed;
+  return validationResult.data;
 }
 
 type IndexSchemaWithDefinition = {
@@ -180,5 +331,39 @@ function summarizeSnapshot(snapshot: DatabaseSchemaSnapshot) {
       };
     }),
   };
+}
+
+/**
+ * Wrapper for advice generation API
+ */
+export async function generateAdviceForSchema(input: { tables: any[]; indexes: any[] }) {
+  const snapshot: DatabaseSchemaSnapshot = {
+    tables: input.tables,
+    columns: [],
+    indexes: input.indexes,
+  };
+
+  const advice = await generateAdviceFromSnapshot(snapshot);
+
+  // Convert to optimization suggestions format
+  return advice.advisories.map((item) => ({
+    tableName: item.table || 'unknown',
+    columnName: item.column,
+    severity: item.severity === 'error' ? 'critical' : item.severity,
+    type: mapCategoryToType(item.category),
+    title: item.headline,
+    description: item.description,
+    sqlSnippet: item.remediation,
+  }));
+}
+
+function mapCategoryToType(category: string): string {
+  const map: Record<string, string> = {
+    missing_index: 'missing_index',
+    optimization: 'slow_query',
+    unused: 'unused_column',
+    security: 'rls_policy',
+  };
+  return map[category] || 'missing_index';
 }
 

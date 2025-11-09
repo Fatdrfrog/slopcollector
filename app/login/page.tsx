@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { motion } from 'motion/react';
 import { useSupabaseClient, authToasts } from '@/lib/auth';
+import { videoUrls } from '@/lib/supabase/storage';
 import { RaccoonWelcome } from '@/app/components/RaccoonWelcome';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -214,10 +215,10 @@ export default function LoginPage() {
                 className="w-full h-auto"
                 onError={(e) => {
                   console.error('Raccoon video failed to load:', e);
-                  console.log('Video path: /racoon.mp4');
+                  console.log('Video path:', videoUrls.racoon());
                 }}
               >
-                <source src="/racoon.mp4" type="video/mp4" />
+                <source src={videoUrls.racoon()} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             </motion.div>

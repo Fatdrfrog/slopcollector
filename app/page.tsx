@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Landing } from './components/Landing';
+import { useRouter } from 'next/navigation';
 import { Header } from './components/Header';
 import { ERDCanvas } from './components/ERDCanvas';
 import { SuggestionsPanel } from './components/SuggestionsPanel';
@@ -18,6 +18,7 @@ import { getBrowserClient } from '@/lib/supabase/client';
  * Main application component for the ERD Panel
  */
 export default function Home() {
+  const router = useRouter();
   const {
     projects,
     activeProjectId,
@@ -64,15 +65,17 @@ export default function Home() {
     }
   }, [user, isConnected]);
 
-  const handleConnect = useCallback(async () => {
-    if (!user) {
-      window.location.href = '/login';
-      return;
-    }
-
-    setIsConnected(true);
-    await refresh();
-  }, [user, refresh]);
+  // Show loading state while checking auth
+  if (authLoading || (!user && !isConnected)) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#0f0f0f]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSignOut = useCallback(async () => {
     await supabaseClient.auth.signOut();
@@ -133,14 +136,12 @@ export default function Home() {
 
   const selectedTableData = tables.find(t => t.id === selectedTable);
 
-  // Show landing page if not connected
-  if (!isConnected) {
-    return (
-      <Landing
-        onConnect={handleConnect}
-      />
-    );
-  }
+  // Redirect to login if not connected
+  useEffect(() => {
+    if (!authLoading && !user && !isConnected) {
+      router.push('/login');
+    }
+  }, [authLoading, user, isConnected, router]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#0f0f0f]">

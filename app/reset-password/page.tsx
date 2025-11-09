@@ -111,14 +111,14 @@ export default function ResetPasswordPage() {
     return (
       <AuthLayout>
         <div className="text-center">
-          <div className="inline-flex items-center justify-center mb-4 w-16 h-16 bg-green-100 rounded-full">
-            <Check className="w-8 h-8 text-green-600" />
+          <div className="inline-flex items-center justify-center mb-4 w-16 h-16 bg-[#7ed321]/20 rounded-lg border border-[#7ed321]/30">
+            <Check className="w-8 h-8 text-[#7ed321]" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Password reset successful!
+          <h1 className="text-2xl font-bold font-mono text-white mb-2">
+            Password Reset!
           </h1>
-          <p className="text-gray-600 mb-6">
-            Your password has been updated. Redirecting you to login...
+          <p className="text-[#999] font-mono text-sm mb-6">
+            Redirecting...
           </p>
         </div>
       </AuthLayout>
@@ -144,23 +144,23 @@ export default function ResetPasswordPage() {
       <AuthLayout>
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
-            <div className="w-16 h-16 bg-linear-to-br from-orange-500 via-pink-500 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center">
-              <Lock className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 bg-[#2a2a2a] border-2 border-[#7ed321] rounded-lg flex items-center justify-center">
+              <Lock className="w-8 h-8 text-[#7ed321]" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Set new password
+          <h1 className="text-2xl font-bold font-mono text-white mb-2">
+            Set New Password
           </h1>
-          <p className="text-gray-600">
-            Choose a strong password for your account
+          <p className="text-[#999] font-mono text-sm">
+            Choose a strong password
           </p>
         </div>
 
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+        {error && (
+          <Alert variant="destructive" className="mb-4 bg-[#ff6b6b]/10 border-[#ff6b6b]">
+            <AlertDescription className="text-[#ff6b6b] font-mono text-sm">{error}</AlertDescription>
+          </Alert>
+        )}
 
           <Form {...resetForm}>
             <form onSubmit={resetForm.handleSubmit(handleResetPassword)} className="space-y-4">
@@ -169,63 +169,56 @@ export default function ResetPasswordPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>New Password</FormLabel>
+                    <FormLabel className="text-[#ccc] font-mono text-sm">New Password</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
                         placeholder="••••••••"
                         autoComplete="new-password"
                         disabled={loading}
-                        {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={resetForm.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <PasswordStrength password={field.value} className="mt-2" />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={resetForm.control}
-              name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        autoComplete="new-password"
-                        disabled={loading}
+                        className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
                         {...field}
                       />
                     </FormControl>
-                    <FormMessage />
+                    <PasswordStrength password={field.value} className="mt-2" />
+                    <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={resetForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[#ccc] font-mono text-sm">Confirm Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        disabled={loading}
+                        className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
                   </FormItem>
                 )}
               />
 
               <Button
                 type="submit"
-                className="w-full bg-linear-to-r from-orange-500 via-pink-500 to-purple-600 hover:from-orange-600 hover:via-pink-600 hover:to-purple-700"
+                className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
                 disabled={loading}
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Resetting password...
+                    Resetting...
                   </>
                 ) : (
-                  'Reset password'
+                  'Reset Password'
                 )}
               </Button>
             </form>
@@ -236,21 +229,13 @@ export default function ResetPasswordPage() {
 
   return (
     <AuthLayout>
-      <div className="text-center mb-8">
-        <BrandHeader showLogo={false} />
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Reset your password
-        </h1>
-        <p className="text-gray-600">
-          Enter your email and we'll send you a reset link
-        </p>
-      </div>
+      <BrandHeader subtitle="Reset your password" />
 
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+      {error && (
+        <Alert variant="destructive" className="mb-4 bg-[#ff6b6b]/10 border-[#ff6b6b]">
+          <AlertDescription className="text-[#ff6b6b] font-mono text-sm">{error}</AlertDescription>
+        </Alert>
+      )}
 
         <Form {...requestForm}>
           <form onSubmit={requestForm.handleSubmit(handleRequestReset)} className="space-y-4">
@@ -259,44 +244,45 @@ export default function ResetPasswordPage() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel className="text-[#ccc] font-mono text-sm">Email</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder="dev@company.com"
                       autoComplete="email"
                       disabled={loading}
+                      className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
                       {...field}
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
                 </FormItem>
               )}
             />
 
             <Button
               type="submit"
-              className="w-full bg-linear-to-r from-orange-500 via-pink-500 to-purple-600 hover:from-orange-600 hover:via-pink-600 hover:to-purple-700"
+              className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
               disabled={loading}
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Sending reset link...
+                  Sending...
                 </>
               ) : (
                 <>
                   <Mail className="w-4 h-4 mr-2" />
-                  Send reset link
+                  Send Reset Link
                 </>
               )}
             </Button>
 
             <div className="text-center">
               <Link href="/login">
-                <Button variant="ghost" className="w-full text-sm">
+                <Button variant="ghost" className="w-full text-sm text-[#999] hover:text-white hover:bg-[#3a3a3a] font-mono">
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to login
+                  Back
                 </Button>
               </Link>
             </div>

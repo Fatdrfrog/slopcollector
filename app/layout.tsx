@@ -3,19 +3,15 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/app/components/ui/sonner";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "SlopCollector - Supabase Database Optimization",
-  description: "Connect your Supabase database and get instant insights on indexing, performance, and schema optimization.",
+  title: "SlopCollector - Find the slop in your Supabase",
+  description: "The raccoon that cleans up your database mess. Connect Supabase, find missing indexes, catch slow queries.",
 };
 
 export default function RootLayout({
@@ -26,10 +22,21 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistMono.variable} antialiased font-mono bg-[#1a1a1a] text-white`}
       >
         {children}
-        <Toaster richColors closeButton position="top-right" />
+        <Toaster 
+          richColors 
+          closeButton 
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: '#2a2a2a',
+              border: '1px solid #3a3a3a',
+              color: '#fff',
+            },
+          }}
+        />
       </body>
     </html>
   );

@@ -1,5 +1,6 @@
 import { Check, Mail } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
+import Link from 'next/link';
 
 interface EmailSentConfirmationProps {
   type?: 'magic-link' | 'reset' | 'confirmation';
@@ -36,23 +37,27 @@ export function EmailSentConfirmation({
 
   return (
     <div className="text-center">
-      <div className="inline-flex items-center justify-center mb-4 w-16 h-16 bg-green-100 rounded-full">
-        <Icon className="w-8 h-8 text-green-600" />
+      <div className="inline-flex items-center justify-center mb-4 w-16 h-16 bg-[#7ed321]/20 rounded-lg border border-[#7ed321]/30">
+        <Icon className="w-8 h-8 text-[#7ed321]" />
       </div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">
+      <h1 className="text-2xl font-bold font-mono text-white mb-2">
         {title}
       </h1>
-      <p className="text-gray-600 mb-6">
+      <p className="text-[#999] font-mono text-sm mb-6">
         {message}
       </p>
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <p className="text-sm text-blue-800">
-          <strong>Pro tip:</strong> The link expires in 1 hour. If you don't see it, check your spam folder.
+      <div className="bg-[#4ecdc4]/10 border border-[#4ecdc4]/30 rounded-lg p-3 mb-6">
+        <p className="text-xs text-[#4ecdc4] font-mono">
+          Link expires in 1 hour. Check spam if needed.
         </p>
       </div>
       {onBack && (
-        <Button variant="outline" className="w-full" onClick={onBack}>
-          Back to sign in
+        <Button 
+          variant="outline" 
+          className="w-full bg-transparent border-[#3a3a3a] text-[#ccc] hover:bg-[#3a3a3a] hover:text-white font-mono" 
+          onClick={onBack}
+        >
+          Back
         </Button>
       )}
     </div>

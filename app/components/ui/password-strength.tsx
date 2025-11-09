@@ -43,27 +43,27 @@ export function PasswordStrength({ password, className }: PasswordStrengthProps)
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">Password strength:</span>
+        <span className="text-[#666] font-mono">Strength:</span>
         <span className={cn(
-          'font-medium',
-          strength.score < 30 && 'text-red-600',
-          strength.score >= 30 && strength.score < 60 && 'text-orange-600',
-          strength.score >= 60 && strength.score < 80 && 'text-yellow-600',
-          strength.score >= 80 && 'text-green-600'
+          'font-mono font-bold',
+          strength.score < 30 && 'text-[#ff6b6b]',
+          strength.score >= 30 && strength.score < 60 && 'text-[#f7b731]',
+          strength.score >= 60 && strength.score < 80 && 'text-[#4ecdc4]',
+          strength.score >= 80 && 'text-[#7ed321]'
         )}>
           {strength.label}
         </span>
       </div>
       <Progress 
         value={strength.score} 
-        className="h-2"
+        className="h-1.5 bg-[#3a3a3a]"
         indicatorClassName={strength.color}
       />
       {strength.score < 60 && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-[#666] font-mono">
           {strength.score < 30 
-            ? 'Try a longer password with numbers and symbols'
-            : 'Add uppercase letters and symbols for better security'
+            ? 'Add numbers & symbols'
+            : 'Add uppercase & symbols'
           }
         </p>
       )}

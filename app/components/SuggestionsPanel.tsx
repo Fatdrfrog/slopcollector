@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { Info, TrendingUp } from 'lucide-react';
+import { Info, TrendingUp, Loader2 } from 'lucide-react';
 import type { Suggestion, Table } from '../types';
 import { SuggestionCard } from './SuggestionCard';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -8,6 +8,7 @@ interface SuggestionsPanelProps {
   suggestions: Suggestion[];
   selectedTable?: Table;
   onSelectTable?: (tableId: string) => void;
+  isLoading?: boolean;
 }
 
 /**
@@ -17,7 +18,8 @@ interface SuggestionsPanelProps {
 export const SuggestionsPanel = memo(function SuggestionsPanel({ 
   suggestions, 
   selectedTable, 
-  onSelectTable 
+  onSelectTable,
+  isLoading = false,
 }: SuggestionsPanelProps) {
   // Memoize filtered suggestions to prevent recalculation on every render
   const filteredSuggestions = useMemo(
@@ -67,7 +69,9 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
 
       {/* Suggestions List */}
       <ScrollArea className="flex-1">
-        {filteredSuggestions.length === 0 ? (
+        {isLoading ? (
+          <LoadingState />
+        ) : filteredSuggestions.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="p-4 space-y-3 pr-3">
@@ -101,6 +105,15 @@ function EmptyState() {
       </div>
       <p>No suggestions for this selection</p>
       <p className="text-xs text-gray-600 mt-1">Everything looks good!</p>
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="p-8 text-center">
+      <Loader2 className="w-8 h-8 text-[#7ed321] mx-auto mb-3 animate-spin" />
+      <p className="text-sm text-[#999]">Loading suggestions...</p>
     </div>
   );
 }

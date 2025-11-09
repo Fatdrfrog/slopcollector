@@ -10,6 +10,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { EmptyState } from './components/EmptyState';
 import { StatusIndicator } from './components/StatusIndicator';
 import { DebugPanel } from './components/DebugPanel';
+import { NoSuggestionsPrompt } from './components/NoSuggestionsPrompt';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTableNavigation } from './hooks/useTableNavigation';
 import { useDashboardData } from './hooks/useDashboardData';
@@ -167,6 +168,30 @@ export default function Home() {
     }
   }, [activeProjectId, remoteTables.length, loading, handleSync]);
 
+  // Auto-generate AI advice on first sync if no suggestions exist
+  useEffect(() => {
+    // Only run if:
+    // 1. We have tables (schema synced)
+    // 2. We have no suggestions yet
+    // 3. Not currently generating
+    // 4. Not currently loading
+    if (
+      activeProjectId &&
+      remoteTables.length > 0 &&
+      remoteSuggestions.length === 0 &&
+      !isGeneratingAdvice &&
+      !loading
+    ) {
+      console.log('🤖 Auto-generating AI advice for first-time project');
+      // Delay slightly to let UI settle
+      const timer = setTimeout(() => {
+        void handleGenerateAdvice();
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [activeProjectId, remoteTables.length, remoteSuggestions.length, isGeneratingAdvice, loading, handleGenerateAdvice]);
+
 
   // Table navigation handlers
   const { selectTable, selectNextTable, clearSelection } = useTableNavigation(
@@ -275,12 +300,22 @@ export default function Home() {
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 420, opacity: 0 }}
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
+                className="h-full"
               >
-                <SuggestionsPanel
-                  suggestions={suggestions}
-                  selectedTable={selectedTableData}
-                  onSelectTable={handleTableSelect}
-                />
+                {suggestions.length === 0 && !loading ? (
+                  <NoSuggestionsPrompt
+                    onGenerateAdvice={handleGenerateAdvice}
+                    isGenerating={isGeneratingAdvice}
+                    hasGeneratedBefore={false}
+                  />
+                ) : (
+                  <SuggestionsPanel
+                    suggestions={suggestions}
+                    selectedTable={selectedTableData}
+                    onSelectTable={handleTableSelect}
+                    isLoading={loading}
+                  />
+                )}
               </motion.div>
               </ResizablePanel>
             )}

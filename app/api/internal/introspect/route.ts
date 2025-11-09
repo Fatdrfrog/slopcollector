@@ -65,20 +65,33 @@ export async function POST(request: Request) {
       requestedSchema
     );
 
+    // Extract foreign key relationships from columns
+    const relationships = schemaSnapshot.columns
+      .filter((col) => col.foreignKeyTo)
+      .map((col) => ({
+        sourceTable: col.tableName,
+        sourceColumn: col.columnName,
+        target: col.foreignKeyTo!,
+      }));
+
     const statistics = {
       capturedSchema: requestedSchema,
       tableCount: schemaSnapshot.tables.length,
       columnCount: schemaSnapshot.columns.length,
       indexCount: schemaSnapshot.indexes.length,
+      relationshipCount: relationships.length,
     };
 
-    // Save snapshot
+    console.log(`📊 Introspection stats:`, statistics);
+
+    // Save snapshot with relationships
     const { data: insertedSnapshot, error: insertError } = await serviceClient
       .from('schema_snapshots')
       .insert({
         project_id: project.id,
         tables_data: schemaSnapshot.tables,
-        relationships_data: [],
+        columns_data: schemaSnapshot.columns,  // Store columns!
+        relationships_data: relationships,
         indexes_data: schemaSnapshot.indexes,
       })
       .select('*')

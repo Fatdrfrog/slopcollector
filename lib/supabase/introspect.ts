@@ -72,8 +72,83 @@ export async function getSimpleTableList(
 }
 
 /**
+ * Get actual foreign key constraints from PostgreSQL pg_catalog
+ * Queries the system tables to get exact FK relationships
+ */
+async function getRealForeignKeyConstraints(
+  supabaseUrl: string,
+  supabaseKey: string
+): Promise<Map<string, string>> {
+  const fkMap = new Map<string, string>();
+  
+  try {
+    const client = createClient(supabaseUrl, supabaseKey);
+    
+    // Use Supabase's metadata API or query pg_catalog directly
+    // This SQL queries the actual foreign key constraints
+    const { data, error } = await client
+      .from('pg_catalog.pg_constraint')
+      .select(`
+        conname,
+        conrelid,
+        confrelid,
+        conkey,
+        confkey
+      `)
+      .eq('contype', 'f'); // 'f' = foreign key
+
+    if (error) {
+      console.warn('Could not access pg_catalog, trying alternative method...');
+      
+      // Alternative: Parse from table metadata in OpenAPI spec
+      const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Prefer': 'return=representation',
+        },
+      });
+
+      if (response.ok) {
+        const spec = await response.json();
+        
+        // PostgREST includes relationship info in definitions
+        if (spec.definitions) {
+          for (const [tableName, tableDef] of Object.entries(spec.definitions as Record<string, any>)) {
+            if (tableDef.properties) {
+              for (const [columnName, prop] of Object.entries(tableDef.properties as Record<string, any>)) {
+                // Check for format: "table_name:fk_constraint_name"
+                if (prop.description && prop.description.includes('Note:')) {
+                  const match = prop.description.match(/References `(\w+)\.(\w+)`/i);
+                  if (match) {
+                    const [, targetTable, targetColumn] = match;
+                    const key = `${tableName}.${columnName}`;
+                    const value = `${targetTable}.${targetColumn}`;
+                    fkMap.set(key, value);
+                    console.log(`🔗 FK from OpenAPI: ${key} → ${value}`);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    if (fkMap.size > 0) {
+      console.log(`✅ Found ${fkMap.size} FK constraints`);
+    }
+  } catch (error) {
+    console.warn('Error querying FK constraints:', error);
+  }
+  
+  return fkMap;
+}
+
+/**
  * Get column details from OpenAPI specification
  * Extracts column info from the definitions section
+ * Now also fetches real foreign key constraints from information_schema
  */
 export async function getColumnsFromOpenAPI(
   supabaseUrl: string,
@@ -81,6 +156,10 @@ export async function getColumnsFromOpenAPI(
   tableNames: string[]
 ): Promise<ColumnSchema[]> {
   try {
+    // First, get real foreign key constraints from PostgreSQL
+    const fkMap = await getRealForeignKeyConstraints(supabaseUrl, supabaseKey);
+    console.log(`🔗 Loaded ${fkMap.size} foreign key constraints`);
+
     const response = await fetch(`${supabaseUrl}/rest/v1/`, {
       headers: {
         'apikey': supabaseKey,
@@ -127,16 +206,52 @@ export async function getColumnsFromOpenAPI(
             pgType = prop.items?.type ? `${prop.items.type}[]` : 'array';
           }
           
-          // Detect foreign keys by convention (column_name ends with _id and is uuid)
-          const isForeignKey = prop.format === 'uuid' && 
-                              columnName.endsWith('_id') && 
-                              columnName !== 'id';
+          // Check for FK from metadata first, then use smart heuristics
+          const fkKey = `${tableName}.${columnName}`;
+          let foreignKeyTo: string | undefined = fkMap.get(fkKey);
           
-          let foreignKeyTo: string | undefined;
-          if (isForeignKey) {
-            foreignKeyTo = `${columnName.replace(/_id$/, '')}.id`;
+          // Smart FK detection if not found in metadata
+          if (!foreignKeyTo && prop.format === 'uuid' && columnName.endsWith('_id') && columnName !== 'id') {
+            const baseName = columnName.replace(/_id$/, '');
+            
+            // Build comprehensive list of possible table names
+            const possibleNames = new Set<string>([
+              baseName,                                      // exact: user_id → user
+              `${baseName}s`,                               // plural: user_id → users
+              baseName.replace(/y$/, 'ies'),               // category_id → categories  
+              baseName.replace(/s$/, 'ses'),               // address_id → addresses
+              baseName.replace(/ch$/, 'ches'),             // batch_id → batches
+              baseName.replace(/sh$/, 'shes'),             // dish_id → dishes
+              baseName.replace(/x$/, 'xes'),               // box_id → boxes
+              baseName.replace(/z$/, 'zes'),               // quiz_id → quizzes
+              baseName.replace(/f$/, 'ves'),               // leaf_id → leaves
+              baseName.replace(/fe$/, 'ves'),              // knife_id → knives
+              baseName.replace(/us$/, 'i'),                // cactus_id → cacti
+              baseName.replace(/is$/, 'es'),               // analysis_id → analyses
+              baseName.replace(/on$/, 'a'),                // criterion_id → criteria
+              baseName + 'es',                              // hero_id → heroes
+              baseName.replace(/man$/, 'men'),             // workman_id → workmen
+              baseName.replace(/person$/, 'people'),       // person_id → people
+              baseName.replace(/child$/, 'children'),      // child_id → children
+            ]);
+            
+            // Find exact match (case-insensitive)
+            for (const possibleName of possibleNames) {
+              const actualTable = tableNames.find(t => t.toLowerCase() === possibleName.toLowerCase());
+              if (actualTable) {
+                foreignKeyTo = `${actualTable}.id`;
+                console.log(`✅ FK matched: ${tableName}.${columnName} → ${foreignKeyTo}`);
+                break;
+              }
+            }
+            
+            if (!foreignKeyTo) {
+              console.warn(`⚠️ FK column found but no matching table: ${tableName}.${columnName} (base: ${baseName}, tried ${possibleNames.size} variations)`);
+            }
+          }
+          
+          if (foreignKeyTo) {
             fkCount++;
-            console.log(`🔗 Detected FK: ${tableName}.${columnName} → ${foreignKeyTo}`);
           }
           
           allColumns.push({

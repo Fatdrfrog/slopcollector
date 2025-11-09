@@ -5,12 +5,13 @@ import { SuggestionCard } from './SuggestionCard';
 interface SuggestionsPanelProps {
   suggestions: Suggestion[];
   selectedTable?: Table;
+  onSelectTable?: (tableId: string) => void;
 }
 
 /**
  * Panel displaying database optimization suggestions
  */
-export function SuggestionsPanel({ suggestions, selectedTable }: SuggestionsPanelProps) {
+export function SuggestionsPanel({ suggestions, selectedTable, onSelectTable }: SuggestionsPanelProps) {
   // Filter suggestions by selected table
   const filteredSuggestions = selectedTable
     ? suggestions.filter(s => s.tableId === selectedTable.id)
@@ -29,9 +30,9 @@ export function SuggestionsPanel({ suggestions, selectedTable }: SuggestionsPane
   const sortedGroups = severityOrder.filter(severity => groupedSuggestions[severity]);
 
   return (
-    <div className="w-[420px] border-l border-gray-800 bg-gradient-to-b from-[#1a1a1a] to-[#151515] overflow-y-auto flex flex-col">
+    <div className="w-[420px] h-full border-l border-gray-800 bg-linear-to-b from-[#1a1a1a] to-[#151515] flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-gray-800 bg-[#0f0f0f]/60 backdrop-blur-sm sticky top-0 z-10">
+      <div className="px-5 py-4 border-b border-gray-800 bg-[#0f0f0f]/60 backdrop-blur-sm flex-shrink-0">
         <h2 className="text-gray-100 flex items-center gap-2.5">
           <div className="p-1.5 bg-indigo-950/30 rounded-lg">
             <TrendingUp className="w-4 h-4 text-indigo-400" />
@@ -62,6 +63,7 @@ export function SuggestionsPanel({ suggestions, selectedTable }: SuggestionsPane
                 key={severity}
                 severity={severity}
                 suggestions={groupedSuggestions[severity]}
+                onSelectTable={onSelectTable}
               />
             ))}
           </div>
@@ -70,7 +72,9 @@ export function SuggestionsPanel({ suggestions, selectedTable }: SuggestionsPane
 
       {/* Summary Stats */}
       {filteredSuggestions.length > 0 && (
-        <SummaryStats groupedSuggestions={groupedSuggestions} />
+        <div className="flex-shrink-0">
+          <SummaryStats groupedSuggestions={groupedSuggestions} />
+        </div>
       )}
     </div>
   );
@@ -91,9 +95,10 @@ function EmptyState() {
 interface SuggestionGroupProps {
   severity: Suggestion['severity'];
   suggestions: Suggestion[];
+  onSelectTable?: (tableId: string) => void;
 }
 
-function SuggestionGroup({ severity, suggestions }: SuggestionGroupProps) {
+function SuggestionGroup({ severity, suggestions, onSelectTable }: SuggestionGroupProps) {
   const dotColor = severity === 'error' 
     ? 'bg-red-500' 
     : severity === 'warning' 
@@ -108,7 +113,11 @@ function SuggestionGroup({ severity, suggestions }: SuggestionGroupProps) {
       </div>
       <div className="space-y-2.5">
         {suggestions.map((suggestion) => (
-          <SuggestionCard key={suggestion.id} suggestion={suggestion} />
+          <SuggestionCard 
+            key={suggestion.id} 
+            suggestion={suggestion}
+            onSelectTable={onSelectTable}
+          />
         ))}
       </div>
     </div>

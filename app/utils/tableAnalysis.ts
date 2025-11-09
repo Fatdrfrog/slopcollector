@@ -1,4 +1,4 @@
-import type { Table, Column } from '../types';
+import type { Table, Column, Suggestion } from '../types';
 
 /**
  * Check if a column is unused (not accessed in over a year)
@@ -17,12 +17,26 @@ export function needsIndex(column: Column): boolean {
 }
 
 /**
- * Check if a table has any issues (missing indexes, unused columns)
+ * Check if a table has schema-detected issues (FK without index, unused columns)
+ * Orange coloring for schema-level issues
+ */
+export function hasSchemaIssues(table: Table): boolean {
+  return table.columns.some(col => needsIndex(col) || isColumnUnused(col));
+}
+
+/**
+ * Check if a table has AI-generated suggestions
+ * Red coloring for AI-detected issues
+ */
+export function hasAISuggestions(tableId: string, suggestions: Suggestion[]): boolean {
+  return suggestions.some(s => s.tableId === tableId);
+}
+
+/**
+ * Check if a table has any issues (legacy - for backwards compatibility)
  */
 export function hasTableIssues(table: Table): boolean {
-  return table.columns.some(col => 
-    needsIndex(col) || isColumnUnused(col)
-  );
+  return hasSchemaIssues(table);
 }
 
 /**

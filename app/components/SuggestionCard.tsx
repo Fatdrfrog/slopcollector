@@ -3,6 +3,7 @@ import type { Suggestion } from '../types';
 
 interface SuggestionCardProps {
   suggestion: Suggestion;
+  onSelectTable?: (tableId: string) => void;
 }
 
 function getSeverityIcon(severity: Suggestion['severity']) {
@@ -30,20 +31,27 @@ function getSeverityStyles(severity: Suggestion['severity']) {
 /**
  * Individual suggestion card component
  */
-export function SuggestionCard({ suggestion }: SuggestionCardProps) {
+export function SuggestionCard({ suggestion, onSelectTable }: SuggestionCardProps) {
+  const handleClick = () => {
+    if (onSelectTable && suggestion.tableId) {
+      onSelectTable(suggestion.tableId);
+    }
+  };
+
   return (
     <div
-      className={`p-3.5 rounded-xl border backdrop-blur-sm ${getSeverityStyles(suggestion.severity)} transition-all hover:shadow-lg cursor-pointer group`}
+      onClick={handleClick}
+      className={`p-3.5 rounded-xl border backdrop-blur-sm ${getSeverityStyles(suggestion.severity)} transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer group`}
     >
       {/* Header */}
       <div className="flex items-start gap-2.5 mb-2.5">
         {getSeverityIcon(suggestion.severity)}
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm text-gray-100 leading-snug">
+          <h3 className="text-sm text-gray-100 leading-snug group-hover:text-white transition-colors">
             {suggestion.title}
           </h3>
           <p className="text-xs text-gray-400 mt-1 flex items-center gap-1.5">
-            <code className="bg-[#0f0f0f] px-1.5 py-0.5 rounded text-xs text-gray-300 font-mono">
+            <code className="bg-[#0f0f0f] px-1.5 py-0.5 rounded text-xs text-gray-300 font-mono group-hover:text-[#7ed321] transition-colors">
               {suggestion.tableName}
             </code>
             {suggestion.columnName && (

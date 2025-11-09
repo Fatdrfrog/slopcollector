@@ -193,3 +193,15 @@
 html {
   font-size: var(--font-size);
 }
+
+/* React Flow edge hover effects */
+.react-flow__edge-path:hover {
+  filter: drop-shadow(0 0 8px currentColor);
+  stroke-width: 3 !important;
+  cursor: pointer;
+}
+
+.react-flow__edge:hover .react-flow__edge-text {
+  fill: #fff;
+  font-weight: 700;
+}

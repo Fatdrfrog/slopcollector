@@ -23,6 +23,7 @@ export function KeyboardHints() {
       <div className="flex items-center gap-4">
         <KeyboardHint shortcut="⌘K" label="Command" />
         <KeyboardHint shortcut="Tab" label="Next" />
+        <KeyboardHint shortcut="⌘B" label="Suggestions" />
         <KeyboardHint shortcut="Esc" label="Clear" />
       </div>
     </div>

@@ -19,15 +19,16 @@ import { generateNodesFromTables } from '../utils/nodeGenerator';
 import { generateEdgesFromTables } from '../utils/edgeGenerator';
 import { getLayoutedElements } from '../utils/layoutGraph';
 import { hasTableIssues } from '../utils/tableAnalysis';
-import type { Table } from '../types';
+import type { Table, Suggestion } from '../types';
 
 interface ERDCanvasProps {
   tables: Table[];
   selectedTable: string | null;
   onTableSelect: (id: string | null) => void;
+  suggestions?: Suggestion[];
 }
 
-function ERDCanvasInner({ tables, selectedTable, onTableSelect }: ERDCanvasProps) {
+function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = [] }: ERDCanvasProps) {
   const { fitView, getNode } = useReactFlow();
   
   // Memoize onTableSelect to prevent unnecessary re-renders
@@ -35,34 +36,36 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect }: ERDCanvasProps
 
   // Only regenerate layout when tables structure changes (not when selection changes)
   const { initialNodes, initialEdges } = useMemo(() => {
-    const nodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect);
-    const edges = generateEdgesFromTables(tables);
-    
-    console.log(`🔗 Generating layout with ${edges.length} edges`);
-    
-    const layouted = getLayoutedElements(nodes, edges, 'TB');
-    
+    const nodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect, suggestions);
+    const baseEdges = generateEdgesFromTables(tables);
+
+    console.log(`🔗 Generating layout with ${baseEdges.length} edges`);
+
+    const layouted = getLayoutedElements(nodes, baseEdges, 'TB');
+    const orientedEdges = generateEdgesFromTables(tables, layouted.nodePositions);
+
     return {
       initialNodes: layouted.nodes,
-      initialEdges: layouted.edges,
+      initialEdges: orientedEdges,
     };
-  }, [tables, memoizedOnTableSelect]);
+  }, [tables, memoizedOnTableSelect, suggestions]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   // Only regenerate layout when tables array actually changes
   useEffect(() => {
-    const newNodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect);
-    const newEdges = generateEdgesFromTables(tables);
-    
-    console.log(`🔄 Layout update: ${newEdges.length} edges`);
-    
-    const layouted = getLayoutedElements(newNodes, newEdges, 'TB');
-    
+    const newNodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect, suggestions);
+    const baseEdges = generateEdgesFromTables(tables);
+
+    console.log(`🔄 Layout update: ${baseEdges.length} edges`);
+
+    const layouted = getLayoutedElements(newNodes, baseEdges, 'TB');
+    const orientedEdges = generateEdgesFromTables(tables, layouted.nodePositions);
+
     setNodes(layouted.nodes);
-    setEdges(layouted.edges);
-  }, [tables, memoizedOnTableSelect, setNodes, setEdges]);
+    setEdges(orientedEdges);
+  }, [tables, memoizedOnTableSelect, suggestions, setNodes, setEdges]);
 
   // Fast update: Only update selection state without recalculating layout
   useEffect(() => {
@@ -116,34 +119,35 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect }: ERDCanvasProps
   }, [onTableSelect]);
 
   const handleRelayout = useCallback(() => {
-    const newNodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect);
-    const newEdges = generateEdgesFromTables(tables);
-    
-    console.log(`♻️ Manual relayout: ${newEdges.length} edges`);
-    
-    const layouted = getLayoutedElements(newNodes, newEdges, 'TB');
-    
+    const newNodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect, suggestions);
+    const baseEdges = generateEdgesFromTables(tables);
+
+    console.log(`♻️ Manual relayout: ${baseEdges.length} edges`);
+
+    const layouted = getLayoutedElements(newNodes, baseEdges, 'TB');
+    const orientedEdges = generateEdgesFromTables(tables, layouted.nodePositions);
+
     setNodes(layouted.nodes);
-    setEdges(layouted.edges);
+    setEdges(orientedEdges);
     
     // Fit view after relayout
     setTimeout(() => {
       fitView({ padding: 0.2, duration: 400 });
     }, 100);
-  }, [tables, selectedTable, memoizedOnTableSelect, setNodes, setEdges, fitView]);
+  }, [tables, selectedTable, memoizedOnTableSelect, suggestions, setNodes, setEdges, fitView]);
 
   const getMiniMapNodeColor = useCallback((node: Node<TableNodeData>) => {
     if (!node.data) {
       return '#3a3a3a';
     }
 
-    const { table, isSelected } = node.data;
-    const hasIssues = hasTableIssues(table);
+    const { isSelected, hasAIIssues, hasSchemaIssues } = node.data;
 
-    if (isSelected) return '#7ed321';     
-    if (hasIssues) return '#ff6b6b';     
+    if (isSelected) return '#7ed321';           // Green for selected
+    if (hasAIIssues) return '#ff6b6b';          // Red for AI issues
+    if (hasSchemaIssues) return '#f7b731';      // Orange for schema issues
 
-    return '#3a3a3a'; 
+    return '#3a3a3a';  // Gray default
   }, []);
 
   return (
@@ -172,11 +176,16 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect }: ERDCanvasProps
         
         <MiniMap
           nodeColor={getMiniMapNodeColor}
+          nodeBorderRadius={4}
           className="bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg shadow-lg"
-          maskColor="rgb(15, 15, 15, 0.7)"
+          maskColor="rgb(15, 15, 15, 0.8)"
           position="bottom-right"
           pannable
           zoomable
+          style={{
+            backgroundColor: '#1a1a1a',
+            border: '1px solid #3a3a3a',
+          }}
         />
       </ReactFlow>
 

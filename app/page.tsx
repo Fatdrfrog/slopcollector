@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'motion/react';
 import { Header } from './components/Header';
 import { ERDCanvas } from './components/ERDCanvas';
 import { SuggestionsPanel } from './components/SuggestionsPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { EmptyState } from './components/EmptyState';
+import { StatusIndicator } from './components/StatusIndicator';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTableNavigation } from './hooks/useTableNavigation';
 import { useDashboardData } from './hooks/useDashboardData';
@@ -42,6 +44,10 @@ export default function Home() {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [isGeneratingAdvice, setIsGeneratingAdvice] = useState(false);
   const [adviceError, setAdviceError] = useState<string>();
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'success' | 'error' | 'loading';
+    message: string;
+  } | null>(null);
 
   // Memoize table selection handler to prevent ERDCanvas re-renders
   const handleTableSelect = useCallback((tableId: string | null) => {
@@ -75,6 +81,8 @@ export default function Home() {
       return;
     }
 
+    setStatusMessage({ type: 'loading', message: 'Syncing schema from Supabase...' });
+
     try {
       const response = await fetch('/api/internal/sync', {
         method: 'POST',
@@ -89,10 +97,14 @@ export default function Home() {
 
       // Refresh to get the new schema
       await refresh();
+      
+      setStatusMessage({ type: 'success', message: 'Schema synced successfully!' });
+      setTimeout(() => setStatusMessage(null), 3000);
     } catch (err) {
-      setAdviceError(
-        err instanceof Error ? err.message : 'Failed to sync schema.'
-      );
+      const errorMsg = err instanceof Error ? err.message : 'Failed to sync schema.';
+      setAdviceError(errorMsg);
+      setStatusMessage({ type: 'error', message: errorMsg });
+      setTimeout(() => setStatusMessage(null), 5000);
     }
   }, [activeProjectId, refresh]);
 
@@ -104,6 +116,7 @@ export default function Home() {
 
     setIsGeneratingAdvice(true);
     setAdviceError(undefined);
+    setStatusMessage({ type: 'loading', message: 'GPT-5 analyzing your schema...' });
 
     try {
       const response = await fetch('/api/internal/advice', {
@@ -117,11 +130,25 @@ export default function Home() {
         throw new Error(data.error ?? response.statusText);
       }
 
+      const result = await response.json();
+
+      // Refresh to get the new suggestions AND updated schema
+      // This ensures table issue coloring updates after advice generation
       await refresh();
+      
+      // Show suggestions panel if hidden
+      setShowSuggestions(true);
+      
+      setStatusMessage({ 
+        type: 'success', 
+        message: `Generated ${result.result?.newSuggestions || 0} optimization suggestions!` 
+      });
+      setTimeout(() => setStatusMessage(null), 4000);
     } catch (err) {
-      setAdviceError(
-        err instanceof Error ? err.message : 'Failed to run AI advice.'
-      );
+      const errorMsg = err instanceof Error ? err.message : 'Failed to run AI advice.';
+      setAdviceError(errorMsg);
+      setStatusMessage({ type: 'error', message: errorMsg });
+      setTimeout(() => setStatusMessage(null), 5000);
     } finally {
       setIsGeneratingAdvice(false);
     }
@@ -142,6 +169,11 @@ export default function Home() {
     setSelectedTable
   );
 
+  // Toggle suggestions panel
+  const toggleSuggestions = useCallback(() => {
+    setShowSuggestions(prev => !prev);
+  }, []);
+
   // Keyboard shortcuts
   useKeyboardShortcuts(
     {
@@ -151,8 +183,9 @@ export default function Home() {
         clearSelection();
       },
       onTab: selectNextTable,
+      onCtrlB: toggleSuggestions, // Ctrl+B to toggle suggestions panel
     },
-    [selectNextTable, clearSelection]
+    [selectNextTable, clearSelection, toggleSuggestions]
   );
 
   const selectedTableData = tables.find(t => t.id === selectedTable);
@@ -212,27 +245,33 @@ export default function Home() {
         </div>
       )}
 
-      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {tables.length === 0 ? (
           <EmptyState onSync={handleSync} isSyncing={loading} />
         ) : (
           <>
-            {/* Canvas */}
             <div className="flex-1 relative">
               <ERDCanvas
                 tables={tables}
                 selectedTable={selectedTable}
                 onTableSelect={handleTableSelect}
+                suggestions={suggestions}
               />
             </div>
 
-            {/* Suggestions Panel */}
             {showSuggestions && (
-              <SuggestionsPanel
-                suggestions={suggestions}
-                selectedTable={selectedTableData}
-              />
+              <motion.div
+                initial={{ x: 420, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 420, opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+              >
+                <SuggestionsPanel
+                  suggestions={suggestions}
+                  selectedTable={selectedTableData}
+                  onSelectTable={handleTableSelect}
+                />
+              </motion.div>
             )}
           </>
         )}
@@ -249,6 +288,17 @@ export default function Home() {
           }}
         />
       )}
+
+      {/* Status Indicator */}
+      <AnimatePresence>
+        {statusMessage && (
+          <StatusIndicator
+            type={statusMessage.type}
+            message={statusMessage.message}
+            onDismiss={() => setStatusMessage(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

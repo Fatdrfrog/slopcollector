@@ -4,6 +4,7 @@ interface KeyboardShortcutHandlers {
   onCommandK?: () => void;
   onEscape?: () => void;
   onTab?: () => void;
+  onCtrlB?: () => void;
 }
 
 /**
@@ -21,6 +22,12 @@ export function useKeyboardShortcuts(
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         handlers.onCommandK?.();
+      }
+      
+      // Ctrl + B - Toggle suggestions panel
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        handlers.onCtrlB?.();
       }
       
       // Escape - Clear selection/close modals

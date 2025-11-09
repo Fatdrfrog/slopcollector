@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase/serviceClient';
 import { generateAIAdviceForProject, storeAdviceSuggestions } from '@/lib/ai/adviceService';
 import type { DatabaseSchemaSnapshot } from '@/lib/supabase/introspect';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Cron job: Generate AI-powered optimization suggestions for all active projects

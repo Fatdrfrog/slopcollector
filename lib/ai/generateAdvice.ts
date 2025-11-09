@@ -1,5 +1,6 @@
 import { getOpenAIClient } from '../openai/client';
 import { z } from 'zod';
+import { zodResponseFormat } from 'openai/helpers/zod';
 import type { DatabaseSchemaSnapshot, IndexSchema, TableSchema } from '../supabase/introspect';
 
 /**
@@ -175,39 +176,107 @@ export async function generateAdviceFromSnapshot(
 ): Promise<GeneratedAdvice> {
   const openai = getOpenAIClient();
   const model = options.model ?? DEFAULT_MODEL;
-  const temperature = options.temperature ?? 0.3; // Slightly higher for creative suggestions
+  const temperature = options.temperature ?? 1;
   const payload = summarizeSnapshot(snapshot);
+
+  console.log(`🤖 Calling OpenAI API with model: ${model}`);
 
   const userPrompt = `Project: ${options.projectName ?? 'Supabase Project'}
 
 Database Schema Analysis:
 ${JSON.stringify(payload, null, 2)}
 
-IMPORTANT: 
+IMPORTANT Context:
 - The schema includes ${payload.tableCount} tables, ${payload.indexCount} indexes, and ${payload.foreignKeyCount} foreign key relationships
-- Each table shows columns with isPrimaryKey and foreignKeyTo fields
-- The foreignKeys array shows ALL relationships across tables
-- Focus on foreign key columns that DON'T have indexes (major performance issue!)
+- Each table object shows:
+  * columns[] with isPrimaryKey and foreignKeyTo fields  
+  * indexes[] with existing indexes
+  * foreignKeys[] showing relationships
+  * rowEstimate and totalBytes for size context
 
-Analyze this COMPLETE schema and provide optimization recommendations following the exact JSON structure specified. Focus on high-impact issues first, especially missing indexes on foreign key columns.`;
+Critical Analysis Focus:
+1. Foreign key columns WITHOUT indexes (check: foreignKeyTo field present but indexed=false)
+2. Large tables (high rowEstimate) without proper indexes on filtered columns
+3. Missing composite indexes for common query patterns
+4. Tables without RLS policies (security risk)
 
-  const response = await openai.chat.completions.create({
-    model,
-    temperature,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt },
-    ],
-    max_completion_tokens: 2000, // Increased for detailed recommendations
-  });
+Provide actionable, high-impact optimization recommendations.`;
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error('Empty response from OpenAI');
+  // GPT-5 reasoning token management
+  // GPT-5 "thinks" internally before responding, consuming tokens for reasoning
+  // If max_tokens is too low, GPT-5 uses all tokens for reasoning → empty response
+  // Solution: Allocate enough tokens for BOTH reasoning + output
+  const isGPT5 = model.toLowerCase().includes('gpt-5');
+  const maxTokens = isGPT5 
+    ? 16000  // GPT-5: ~8000-12000 for reasoning + 4000-8000 for output
+    : 4000;  // GPT-4/other: normal allocation
+
+  let response;
+  try {
+    response = await openai.chat.completions.create({
+      model,
+      temperature,
+      response_format: zodResponseFormat(GeneratedAdviceSchema, 'database_advice'),
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      max_completion_tokens: maxTokens,
+    });
+  } catch (error) {
+    console.error('❌ OpenAI API error:', error);
+    throw new Error(
+      `OpenAI API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 
-  // Parse and validate with Zod
+  const choice = response.choices[0];
+  const finishReason = choice?.finish_reason;
+  const usage = response.usage;
+
+  // Log token usage (especially reasoning tokens for GPT-5)
+  console.log(`✅ OpenAI response received:`, {
+    model: response.model,
+    finishReason,
+    totalTokens: usage?.total_tokens,
+    completionTokens: usage?.completion_tokens,
+    // @ts-ignore - reasoning_tokens might not be in types yet
+    reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens,
+  });
+
+  // Handle GPT-5 reasoning token exhaustion
+  if (!choice?.message?.content && finishReason === 'length') {
+    // @ts-ignore
+    const reasoningTokens = usage?.completion_tokens_details?.reasoning_tokens || 0;
+    const suggestedTokens = Math.ceil((reasoningTokens + 2000) * 1.2); // 20% buffer
+
+    console.error('❌ GPT-5 used all tokens for reasoning, no output produced!', {
+      reasoningTokens,
+      maxTokensUsed: maxTokens,
+      suggestedMinimum: suggestedTokens,
+    });
+
+    throw new Error(
+      `[GPT-5 Notice] Model used all ${maxTokens} tokens for internal reasoning (${reasoningTokens} reasoning tokens). ` +
+      `No output was produced. Suggested minimum: ${suggestedTokens} tokens. ` +
+      `This is automatically handled now - please retry.`
+    );
+  }
+
+  const content = choice?.message?.content;
+  if (!content) {
+    console.error('❌ Empty content in response:', {
+      choices: response.choices,
+      model: response.model,
+      usage: response.usage,
+      finishReason,
+    });
+    throw new Error(
+      `Empty response from OpenAI. Model: ${model}, Finish reason: ${finishReason || 'none'}`
+    );
+  }
+
+  // Parse JSON (Structured Outputs guarantees valid JSON)
   let rawParsed: unknown;
   try {
     rawParsed = JSON.parse(content);
@@ -215,11 +284,11 @@ Analyze this COMPLETE schema and provide optimization recommendations following 
     throw new Error(`Failed to parse JSON: ${(error as Error).message}`);
   }
 
-  // Validate against schema
+  // Validate with Zod (should always pass with Structured Outputs)
   const validationResult = GeneratedAdviceSchema.safeParse(rawParsed);
   
   if (!validationResult.success) {
-    console.error('Zod validation failed:', validationResult.error);
+    console.error('❌ Zod validation failed (unexpected with Structured Outputs):', validationResult.error);
     
     // Fallback: Try to salvage what we can
     const fallback = rawParsed as any;
@@ -232,6 +301,7 @@ Analyze this COMPLETE schema and provide optimization recommendations following 
     };
   }
 
+  console.log(`✅ Generated ${validationResult.data.advisories.length} optimization suggestions`);
   return validationResult.data;
 }
 

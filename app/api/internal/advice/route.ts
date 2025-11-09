@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { getUsageEntitlement } from '@/lib/commerce/stripe';
 import { getServiceClient } from '@/lib/supabase/serviceClient';
 import { getServerClient } from '@/lib/supabase/server';

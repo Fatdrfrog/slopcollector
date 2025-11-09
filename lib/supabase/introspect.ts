@@ -95,6 +95,8 @@ export async function getColumnsFromOpenAPI(
     const spec = await response.json();
     const definitions = spec.definitions || {};
     const allColumns: ColumnSchema[] = [];
+    
+    let fkCount = 0;
 
     for (const tableName of tableNames) {
       const tableDef = definitions[tableName];
@@ -130,6 +132,13 @@ export async function getColumnsFromOpenAPI(
                               columnName.endsWith('_id') && 
                               columnName !== 'id';
           
+          let foreignKeyTo: string | undefined;
+          if (isForeignKey) {
+            foreignKeyTo = `${columnName.replace(/_id$/, '')}.id`;
+            fkCount++;
+            console.log(`🔗 Detected FK: ${tableName}.${columnName} → ${foreignKeyTo}`);
+          }
+          
           allColumns.push({
             schema: 'public',
             tableName,
@@ -138,11 +147,13 @@ export async function getColumnsFromOpenAPI(
             isNullable: !required.includes(columnName),
             columnDefault: prop.default || null,
             isPrimaryKey: columnName === 'id',
-            foreignKeyTo: isForeignKey ? `${columnName.replace(/_id$/, '')}.id` : undefined,
+            foreignKeyTo,
           });
         });
       }
     }
+    
+    console.log(`✅ Detected ${fkCount} foreign key relationships across ${tableNames.length} tables`);
 
     return allColumns;
   } catch (error) {

@@ -5,6 +5,5 @@
 
 export { AuthLayout } from './AuthLayout';
 export { BrandHeader } from './BrandHeader';
-export { EmailSentConfirmation } from './EmailSentConfirmation';
 export { AuthFormSkeleton } from './AuthFormSkeleton';
 

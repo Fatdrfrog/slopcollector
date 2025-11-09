@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
+import { getAssetUrl, ASSETS } from '@/lib/supabase/assets';
 
 /**
  * Raccoon Welcome Animation
@@ -46,7 +47,7 @@ export function RaccoonWelcome({ onComplete }: { onComplete: () => void }) {
           onEnded={handleVideoEnd}
           className="w-full h-auto rounded-lg"
         >
-          <source src="/hi.mp4" type="video/mp4" />
+          <source src={getAssetUrl(ASSETS.HI_VIDEO)} type="video/mp4" />
         </video>
         <motion.p
           className="text-center text-[#7ed321] font-mono text-lg mt-6"

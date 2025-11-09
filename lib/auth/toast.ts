@@ -1,62 +1,34 @@
 import { toast } from 'sonner';
 
 /**
- * Auth Toast Notifications
- * DRY: Centralized toast messages for auth operations
- * Singleton pattern: Consistent messaging across app
+ * Auth Toast Notifications (Simplified)
+ * For Supabase credential-based auth
  */
 
 export const authToasts = {
-  /**
-   * Success messages
-   */
-  magicLinkSent: (email: string) => {
-    toast.success('Magic link sent!', {
-      description: `Check ${email} for your sign-in link. It expires in 1 hour.`,
-      duration: 6000,
-    });
-  },
-
-  emailConfirmationSent: (email: string) => {
-    toast.success('Check your email', {
-      description: `We've sent a confirmation link to ${email}. Click it to verify your account.`,
-      duration: 6000,
-    });
-  },
-
-  passwordResetSent: (email: string) => {
-    toast.success('Reset link sent!', {
-      description: `Check ${email} for your password reset link.`,
-      duration: 6000,
-    });
-  },
-
-  passwordResetSuccess: () => {
-    toast.success('Password updated!', {
-      description: 'Your password has been successfully changed.',
-      duration: 4000,
+  connectionSuccess: () => {
+    toast.success('Connected!', {
+      description: 'Supabase credentials verified successfully.',
+      duration: 2000,
     });
   },
 
   signInSuccess: () => {
-    toast.success('Welcome back!', {
-      description: 'You have successfully signed in.',
-      duration: 3000,
+    toast.success('Welcome! 🦝', {
+      description: 'Loading your database schema...',
+      duration: 2000,
     });
   },
 
   signOutSuccess: () => {
-    toast.success('Signed out', {
-      description: 'You have been successfully signed out.',
+    toast.success('Disconnected', {
+      description: 'Your session has been ended.',
       duration: 3000,
     });
   },
 
-  /**
-   * Error messages
-   */
   authError: (message: string) => {
-    toast.error('Authentication failed', {
+    toast.error('Connection failed', {
       description: message,
       duration: 5000,
     });
@@ -64,37 +36,9 @@ export const authToasts = {
 
   invalidCredentials: () => {
     toast.error('Invalid credentials', {
-      description: 'The email or password you entered is incorrect.',
+      description: 'Check your Supabase URL and API key.',
       duration: 4000,
     });
-  },
-
-  emailNotConfirmed: () => {
-    toast.error('Email not confirmed', {
-      description: 'Please check your email and confirm your account first.',
-      duration: 5000,
-      action: {
-        label: 'Resend',
-        onClick: () => toast.info('Resend feature coming soon'),
-      },
-    });
-  },
-
-  /**
-   * Info messages
-   */
-  checkSpam: () => {
-    toast.info('Can\'t find the email?', {
-      description: 'Check your spam folder or wait a few minutes.',
-      duration: 4000,
-    });
-  },
-
-  /**
-   * Loading states
-   */
-  loading: (message: string) => {
-    return toast.loading(message);
   },
 };
 

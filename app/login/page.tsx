@@ -6,11 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { motion } from 'motion/react';
-import { useSupabaseClient } from '@/lib/auth/hooks';
-import { getAuthCallbackUrl, formatAuthError } from '@/lib/auth/utils';
-import { authToasts } from '@/lib/auth/toast';
-import { EmailSentConfirmation } from '@/app/components/auth/EmailSentConfirmation';
-import { PasswordStrength } from '@/app/components/ui/password-strength';
+import { useSupabaseClient, authToasts } from '@/lib/auth';
 import { RaccoonWelcome } from '@/app/components/RaccoonWelcome';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -24,122 +20,82 @@ import {
   FormDescription,
 } from '@/app/components/ui/form';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
-import { Loader2, Mail, Zap, Lock, Database, Search, BarChart3, Code2 } from 'lucide-react';
+import { Loader2, Database, Search, BarChart3, Code2, ExternalLink } from 'lucide-react';
+import { getAssetUrl, ASSETS } from '@/lib/supabase/assets';
 
-// Magic Link (passwordless) - fastest for devs
-const magicLinkSchema = z.object({
-  email: z.string().email('Please enter a valid work email'),
+// Supabase credentials authentication
+const supabaseConnectSchema = z.object({
+  supabaseUrl: z.string().url('Please enter a valid Supabase URL').refine(
+    (url) => url.includes('supabase.co') || url.includes('localhost'),
+    'Must be a valid Supabase URL'
+  ),
+  supabaseKey: z.string().min(20, 'Please enter your Supabase anon or service role key'),
 });
 
-// Password auth - for returning users
-const passwordSchema = z.object({
-  email: z.string().email('Please enter a valid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-});
-
-type MagicLinkFormValues = z.infer<typeof magicLinkSchema>;
-type PasswordFormValues = z.infer<typeof passwordSchema>;
+type SupabaseConnectFormValues = z.infer<typeof supabaseConnectSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
   const supabase = useSupabaseClient();
-  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string>();
-  const [emailSent, setEmailSent] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
 
-  const magicLinkForm = useForm<MagicLinkFormValues>({
-    resolver: zodResolver(magicLinkSchema),
-    defaultValues: { email: '' },
+  const connectForm = useForm<SupabaseConnectFormValues>({
+    resolver: zodResolver(supabaseConnectSchema),
+    defaultValues: { 
+      supabaseUrl: '', 
+      supabaseKey: '' 
+    },
   });
 
-  const passwordForm = useForm<PasswordFormValues>({
-    resolver: zodResolver(passwordSchema),
-    defaultValues: { email: '', password: '' },
-  });
-
-  const handleMagicLink = async (values: MagicLinkFormValues) => {
-    setMagicLinkLoading(true);
+  const handleConnect = async (values: SupabaseConnectFormValues) => {
+    setConnecting(true);
     setError(undefined);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: values.email,
-        options: {
-          emailRedirectTo: getAuthCallbackUrl(),
+      // Verify credentials by making a test API call
+      const testResponse = await fetch(`${values.supabaseUrl}/rest/v1/`, {
+        headers: {
+          'apikey': values.supabaseKey,
+          'Authorization': `Bearer ${values.supabaseKey}`,
         },
       });
 
-      if (error) throw error;
-      authToasts.magicLinkSent(values.email);
-      setEmailSent(true);
-      
-      // Show helpful tip after 3 seconds
-      setTimeout(() => authToasts.checkSpam(), 3000);
+      if (!testResponse.ok) {
+        throw new Error('Invalid Supabase credentials. Check your URL and API key.');
+      }
+
+      // Create anonymous session in our app
+      const { data: { user }, error: signInError } = await supabase.auth.signInAnonymously();
+
+      if (signInError) throw signInError;
+
+      if (!user) throw new Error('Failed to create session');
+
+      // Store Supabase credentials in user profile
+      const { error: profileError } = await supabase
+        .from('connected_projects')
+        .insert({
+          user_id: user.id,
+          project_name: 'My Supabase Project',
+          supabase_url: values.supabaseUrl,
+          supabase_anon_key: values.supabaseKey,
+          is_active: true,
+        });
+
+      if (profileError) throw profileError;
+
+      // Show welcome animation
+      authToasts.signInSuccess();
+      setShowWelcome(true);
     } catch (err) {
-      const errorMessage = formatAuthError(err, 'Failed to send magic link');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to connect to Supabase';
       authToasts.authError(errorMessage);
       setError(errorMessage);
     } finally {
-      setMagicLinkLoading(false);
+      setConnecting(false);
     }
-  };
-
-  const handlePassword = async (values: PasswordFormValues) => {
-    setPasswordLoading(true);
-    setError(undefined);
-
-    try {
-      if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email: values.email,
-          password: values.password,
-          options: {
-            emailRedirectTo: getAuthCallbackUrl(),
-          },
-        });
-
-        if (error) throw error;
-        authToasts.emailConfirmationSent(values.email);
-        setEmailSent(true);
-        setTimeout(() => authToasts.checkSpam(), 3000);
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: values.email,
-          password: values.password,
-        });
-
-        if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            authToasts.invalidCredentials();
-          } else if (error.message.includes('Email not confirmed')) {
-            authToasts.emailNotConfirmed();
-          } else {
-            authToasts.authError(error.message);
-          }
-          throw error;
-        }
-        
-        // Show welcome animation before redirecting
-        authToasts.signInSuccess();
-        setShowWelcome(true);
-      }
-    } catch (err) {
-      const errorMessage = formatAuthError(err, `Failed to ${isSignUp ? 'sign up' : 'sign in'}`);
-      setError(errorMessage);
-    } finally {
-      setPasswordLoading(false);
-    }
-  };
-
-  const handleBack = () => {
-    setEmailSent(false);
-    magicLinkForm.reset();
-    passwordForm.reset();
-    setError(undefined);
   };
 
   const handleWelcomeComplete = () => {
@@ -151,27 +107,9 @@ export default function LoginPage() {
     return <RaccoonWelcome onComplete={handleWelcomeComplete} />;
   }
 
-  if (emailSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1a1a1a] p-4">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-[#2a2a2a] rounded-lg shadow-2xl p-8 border border-[#3a3a3a]"
-        >
-          <EmailSentConfirmation 
-            type={isSignUp ? 'confirmation' : 'magic-link'}
-            onBack={handleBack}
-          />
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#1a1a1a]">
       <div className="h-screen flex flex-col lg:flex-row">
-        {/* Left Side - Value Proposition & Raccoon Video */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -179,7 +117,6 @@ export default function LoginPage() {
           className="lg:w-1/2 flex flex-col items-center justify-center p-8 lg:p-12 relative"
         >
           <div className="max-w-lg w-full">
-            {/* Logo & Headline */}
             <motion.div 
               className="mb-6"
               initial={{ opacity: 0, y: 20 }}
@@ -189,12 +126,13 @@ export default function LoginPage() {
               <h1 className="text-6xl font-mono font-bold text-[#7ed321] mb-2">
                 SlopCollector
               </h1>
-              <p className="text-lg text-[#999] font-mono">
-                Find the slop in your Supabase schema
+              <p className="text-base text-[#999] font-mono mb-1">
+                Find the slop in your Supabase
+              </p>
+              <p className="text-xs text-[#666] font-mono">
+                No signup. Just paste your project credentials.
               </p>
             </motion.div>
-
-            {/* Raccoon Video - Idle State */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -208,7 +146,7 @@ export default function LoginPage() {
                 playsInline
                 className="w-full h-auto"
               >
-                <source src="/racoon.mp4" type="video/mp4" />
+                <source src={getAssetUrl(ASSETS.RACCOON_VIDEO)}  type="video/mp4" />
               </video>
             </motion.div>
 
@@ -221,22 +159,22 @@ export default function LoginPage() {
             >
               <div className="flex items-center gap-3">
                 <Database className="w-4 h-4 text-[#7ed321]" />
-                <p className="text-sm text-[#ccc] font-mono">Connect Supabase in one click</p>
+                <p className="text-sm text-[#ccc] font-mono">Paste URL + API key → instant access</p>
               </div>
               
               <div className="flex items-center gap-3">
                 <Search className="w-4 h-4 text-[#ff6b6b]" />
-                <p className="text-sm text-[#ccc] font-mono">Find missing indexes instantly</p>
+                <p className="text-sm text-[#ccc] font-mono">Scan all tables for missing indexes</p>
               </div>
               
               <div className="flex items-center gap-3">
                 <BarChart3 className="w-4 h-4 text-[#4ecdc4]" />
-                <p className="text-sm text-[#ccc] font-mono">Get real performance insights</p>
+                <p className="text-sm text-[#ccc] font-mono">See exact performance impact</p>
               </div>
 
               <div className="flex items-center gap-3">
                 <Code2 className="w-4 h-4 text-[#f7b731]" />
-                <p className="text-sm text-[#ccc] font-mono">Keyboard-first workflow (⌘K)</p>
+                <p className="text-sm text-[#ccc] font-mono">Keyboard shortcuts (⌘K to search)</p>
               </div>
             </motion.div>
           </div>
@@ -257,10 +195,10 @@ export default function LoginPage() {
           >
             <div className="text-center mb-6">
               <h2 className="text-2xl font-mono font-bold text-white mb-2">
-                {isSignUp ? 'Create Account' : 'Sign In'}
+                Connect Your Supabase
               </h2>
               <p className="text-sm text-[#999] font-mono">
-                {isSignUp ? 'Start collecting slop' : 'Welcome back'}
+                Enter your project credentials to start
               </p>
             </div>
 
@@ -275,61 +213,80 @@ export default function LoginPage() {
               </motion.div>
             )}
 
-            <Tabs defaultValue="magic" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6 bg-[#1a1a1a] border border-[#3a3a3a]">
-                <TabsTrigger 
-                  value="magic" 
-                  className="flex items-center gap-2 data-[state=active]:bg-[#7ed321] data-[state=active]:text-black font-mono text-[#999]"
-                >
-                  <Zap className="w-4 h-4" />
-                  Magic
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="password" 
-                  className="flex items-center gap-2 data-[state=active]:bg-[#7ed321] data-[state=active]:text-black font-mono text-[#999]"
-                >
-                  <Lock className="w-4 h-4" />
-                  Password
-                </TabsTrigger>
-              </TabsList>
-
-          <TabsContent value="magic" className="space-y-4">
             <motion.div 
-              className="bg-[#7ed321]/10 border border-[#7ed321]/30 rounded-lg p-3 mb-4"
+              className="bg-[#4ecdc4]/10 border border-[#4ecdc4]/30 rounded-lg p-3 mb-4"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <div className="flex items-start gap-3">
-                <Zap className="w-4 h-4 text-[#7ed321] mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-xs text-[#7ed321] font-mono">No password needed</p>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <Database className="w-4 h-4 text-[#4ecdc4] mt-0.5 shrink-0" />
+                  <p className="text-xs text-[#4ecdc4] font-mono">
+                    Dashboard → Settings → API
+                  </p>
+                </div>
+                <div className="text-xs text-[#666] font-mono space-y-1">
+                  <p>• Copy "Project URL"</p>
+                  <p>• Copy "anon public" key</p>
                 </div>
               </div>
             </motion.div>
 
-            <Form {...magicLinkForm}>
-              <form onSubmit={magicLinkForm.handleSubmit(handleMagicLink)} className="space-y-4">
+            <Form {...connectForm}>
+              <form onSubmit={connectForm.handleSubmit(handleConnect)} className="space-y-4">
                 <FormField
-                  control={magicLinkForm.control}
-                  name="email"
+                  control={connectForm.control}
+                  name="supabaseUrl"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[#ccc] font-mono text-sm">Email</FormLabel>
+                      <FormLabel className="text-[#ccc] font-mono text-sm">Project URL</FormLabel>
                       <FormControl>
-                        <motion.div
-                          whileFocus={{ scale: 1.01 }}
-                          transition={{ duration: 0.2 }}
-                        >
+                        <motion.div whileFocus={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
                           <Input
-                            type="email"
-                            placeholder="dev@company.com"
-                            autoComplete="email"
-                            disabled={magicLinkLoading}
+                            type="url"
+                            placeholder="https://xxx.supabase.co"
+                            autoComplete="url"
+                            disabled={connecting}
                             className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
                             {...field}
                           />
                         </motion.div>
                       </FormControl>
+                      <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={connectForm.control}
+                  name="supabaseKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel className="text-[#ccc] font-mono text-sm">API Key (anon/public)</FormLabel>
+                        <button
+                          type="button"
+                          onClick={() => field.onChange(field.value ? '' : field.value)}
+                          className="text-xs text-[#4ecdc4] hover:text-[#3dbdb5] font-mono"
+                        >
+                          {field.value.length > 0 && '***'}
+                        </button>
+                      </div>
+                      <FormControl>
+                        <motion.div whileFocus={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
+                          <Input
+                            type="password"
+                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                            autoComplete="off"
+                            disabled={connecting}
+                            className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321] text-xs"
+                            {...field}
+                          />
+                        </motion.div>
+                      </FormControl>
+                      <FormDescription className="text-[#666] font-mono text-xs">
+                        Read-only access. Your key stays local.
+                      </FormDescription>
                       <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
                     </FormItem>
                   )}
@@ -339,139 +296,39 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
-                    disabled={magicLinkLoading}
+                    disabled={connecting}
                   >
-                    {magicLinkLoading ? (
+                    {connecting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sending...
+                        Verifying...
                       </>
                     ) : (
                       <>
-                        <Mail className="w-4 h-4 mr-2" />
-                        Send Magic Link
+                        <Database className="w-4 h-4 mr-2" />
+                        Connect & Start
                       </>
                     )}
                   </Button>
                 </motion.div>
               </form>
             </Form>
-          </TabsContent>
-
-          <TabsContent value="password" className="space-y-4">
-            <Form {...passwordForm}>
-              <form onSubmit={passwordForm.handleSubmit(handlePassword)} className="space-y-4">
-                <FormField
-                  control={passwordForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[#ccc] font-mono text-sm">Email</FormLabel>
-                      <FormControl>
-                        <motion.div whileFocus={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
-                          <Input
-                            type="email"
-                            placeholder="dev@company.com"
-                            autoComplete="email"
-                            disabled={passwordLoading}
-                            className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
-                            {...field}
-                          />
-                        </motion.div>
-                      </FormControl>
-                      <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={passwordForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center justify-between">
-                        <FormLabel className="text-[#ccc] font-mono text-sm">Password</FormLabel>
-                        {!isSignUp && (
-                          <a 
-                            href="/reset-password"
-                            className="text-xs text-[#4ecdc4] hover:text-[#3dbdb5] font-mono hover:underline"
-                          >
-                            Forgot?
-                          </a>
-                        )}
-                      </div>
-                      <FormControl>
-                        <motion.div whileFocus={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
-                          <Input
-                            type="password"
-                            placeholder="••••••••"
-                            autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                            disabled={passwordLoading}
-                            className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
-                            {...field}
-                          />
-                        </motion.div>
-                      </FormControl>
-                      {isSignUp && (
-                        <>
-                          <FormDescription className="text-[#666] font-mono text-xs">
-                            Min 8 chars
-                          </FormDescription>
-                          <PasswordStrength password={field.value} />
-                        </>
-                      )}
-                      <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="space-y-2">
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button
-                      type="submit"
-                      className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
-                      disabled={passwordLoading}
-                    >
-                      {passwordLoading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          {isSignUp ? 'Creating...' : 'Signing in...'}
-                        </>
-                      ) : (
-                        isSignUp ? 'Create Account' : 'Sign In'
-                      )}
-                    </Button>
-                  </motion.div>
-
-                  <motion.div whileHover={{ scale: 1.01 }}>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full text-sm text-[#999] hover:text-white hover:bg-[#3a3a3a] font-mono"
-                      onClick={() => {
-                        setIsSignUp(!isSignUp);
-                        setError(undefined);
-                        passwordForm.clearErrors();
-                      }}
-                      disabled={passwordLoading}
-                    >
-                      {isSignUp 
-                        ? 'Have an account? Sign in' 
-                        : "New? Sign up"}
-                    </Button>
-                  </motion.div>
-                </div>
-              </form>
-            </Form>
-          </TabsContent>
-        </Tabs>
 
             <motion.div 
-              className="mt-6 pt-6 border-t border-[#3a3a3a]"
+              className="mt-6 pt-6 border-t border-[#3a3a3a] space-y-3"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
             >
+              <a
+                href="https://supabase.com/dashboard/project/_/settings/api"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 text-xs text-[#4ecdc4] hover:text-[#3dbdb5] font-mono hover:underline"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Open Supabase Dashboard
+              </a>
               <div className="flex items-center justify-center gap-2 text-xs text-[#666] font-mono">
                 <span>Tip:</span>
                 <kbd className="px-2 py-1 text-xs font-mono bg-[#1a1a1a] border border-[#3a3a3a] rounded">

@@ -5,6 +5,6 @@
 
 export { useSupabaseClient } from './hooks';
 export { getUserProfile, getUserInitials, getUserDisplayName } from './userProfile';
-export { getAuthCallbackUrl, formatAuthError, isValidEmail } from './utils';
+export { formatAuthError } from './utils';
 export { authToasts } from './toast';
 

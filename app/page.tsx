@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { Header } from './components/Header';
@@ -14,7 +14,7 @@ import { useTableNavigation } from './hooks/useTableNavigation';
 import { useDashboardData } from './hooks/useDashboardData';
 import { useProjects } from './hooks/useProjects';
 import { useSupabaseSession } from './hooks/useSupabaseSession';
-import { getBrowserClient } from '@/lib/supabase/client';
+import { useSupabaseClient } from '@/lib/auth/hooks';
 
 /**
  * Main application component for the ERD Panel
@@ -36,7 +36,7 @@ export default function Home() {
     refresh,
   } = useDashboardData(activeProjectId);
   const { user, loading: authLoading } = useSupabaseSession();
-  const supabaseClient = useMemo(() => getBrowserClient(), []);
+  const supabaseClient = useSupabaseClient();
 
   const [isConnected, setIsConnected] = useState(false);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -54,9 +54,9 @@ export default function Home() {
     setSelectedTable(tableId);
   }, []);
 
-  // Only show real data - no mock data fallback
-  const tables = useMemo(() => remoteTables, [remoteTables]);
-  const suggestions = useMemo(() => remoteSuggestions, [remoteSuggestions]);
+  // Use remote data directly (already memoized in useDashboardData)
+  const tables = remoteTables;
+  const suggestions = remoteSuggestions;
 
   useEffect(() => {
     if (remoteTables.length > 0) {

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Info, TrendingUp } from 'lucide-react';
 import type { Suggestion, Table } from '../types';
 import { SuggestionCard } from './SuggestionCard';
@@ -12,9 +12,13 @@ interface SuggestionsPanelProps {
 
 /**
  * Panel displaying database optimization suggestions
- * Optimized with memoization to prevent unnecessary re-renders
+ * Optimized with React.memo and useMemo to prevent unnecessary re-renders
  */
-export function SuggestionsPanel({ suggestions, selectedTable, onSelectTable }: SuggestionsPanelProps) {
+export const SuggestionsPanel = memo(function SuggestionsPanel({ 
+  suggestions, 
+  selectedTable, 
+  onSelectTable 
+}: SuggestionsPanelProps) {
   // Memoize filtered suggestions to prevent recalculation on every render
   const filteredSuggestions = useMemo(
     () => selectedTable ? suggestions.filter(s => s.tableId === selectedTable.id) : suggestions,
@@ -39,7 +43,7 @@ export function SuggestionsPanel({ suggestions, selectedTable, onSelectTable }: 
   );
 
   return (
-    <div className="w-[420px] h-full border-l border-gray-800 bg-gradient-to-b from-[#1a1a1a] to-[#151515] flex flex-col overflow-hidden">
+    <div className="w-[420px] h-full border-l border-gray-800 bg-linear-to-b from-[#1a1a1a] to-[#151515] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-gray-800 bg-[#0f0f0f]/60 backdrop-blur-sm flex-shrink-0">
         <h2 className="text-gray-100 flex items-center gap-2.5">
@@ -87,7 +91,7 @@ export function SuggestionsPanel({ suggestions, selectedTable, onSelectTable }: 
       )}
     </div>
   );
-}
+});
 
 function EmptyState() {
   return (

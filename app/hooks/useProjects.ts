@@ -1,22 +1,30 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { getBrowserClient } from '@/lib/supabase/client';
-import type { Tables } from '@/lib/database.types';
+import { useCallback, useEffect, useState } from 'react';
+import { useSupabaseClient } from '@/lib/auth/hooks';
 
-type ConnectedProjectRow = Pick<
-  Tables<'connected_projects'>,
-  'id' | 'project_name' | 'supabase_url' | 'is_active' | 'last_synced_at' | 'github_enabled' | 'github_repo_url'
->;
+/**
+ * Extended type for connected_projects with GitHub fields
+ * (Database types are auto-generated and may lag behind schema changes)
+ */
+interface ConnectedProjectRow {
+  id: string;
+  project_name: string | null;
+  supabase_url: string;
+  is_active: boolean | null;
+  last_synced_at: string | null;
+  github_enabled: boolean | null;
+  github_repo_url: string | null;
+}
 
 export interface ProjectSummary {
   id: string;
   projectName: string;
   supabaseUrl: string;
   isActive: boolean;
-  lastSyncedAt?: string | null;
-  githubEnabled?: boolean;
-  githubRepoUrl?: string | null;
+  lastSyncedAt: string | null;
+  githubEnabled: boolean;
+  githubRepoUrl: string | null;
 }
 
 interface UseProjectsResult {
@@ -25,59 +33,64 @@ interface UseProjectsResult {
   setActiveProjectId: (projectId: string) => void;
   loading: boolean;
   error?: string;
+  refresh: () => Promise<void>;
 }
 
+/**
+ * Hook to fetch and manage connected Supabase projects
+ * Uses singleton Supabase client via useSupabaseClient
+ */
 export function useProjects(): UseProjectsResult {
-  const supabase = useMemo(() => getBrowserClient(), []);
+  const supabase = useSupabaseClient();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
 
-  useEffect(() => {
-    let mounted = true;
+  const fetchProjects = useCallback(async () => {
     setLoading(true);
+    setError(undefined);
 
-    supabase
-      .from('connected_projects')
-      .select('id, project_name, supabase_url, is_active, last_synced_at, github_enabled, github_repo_url')
-      .order('created_at', { ascending: false })
-      .then(({ data, error: queryError }) => {
-        if (!mounted) return;
-        if (queryError) {
-          setError(queryError.message);
-          setProjects([]);
-          setActiveProjectId(undefined);
-          setLoading(false);
-          return;
-        }
+    try {
+      const { data, error: queryError } = await supabase
+        .from('connected_projects')
+        .select('id, project_name, supabase_url, is_active, last_synced_at, github_enabled, github_repo_url')
+        .order('created_at', { ascending: false });
 
-        setError(undefined);
+      if (queryError) {
+        throw queryError;
+      }
 
-        const projectData = ((data ?? []) as ConnectedProjectRow[]).map((row) => ({
-          id: row.id,
-          projectName: row.project_name ?? 'Supabase Project',
-          supabaseUrl: row.supabase_url,
-          isActive: Boolean(row.is_active),
-          lastSyncedAt: row.last_synced_at ?? null,
-          githubEnabled: Boolean(row.github_enabled),
-          githubRepoUrl: row.github_repo_url ?? null,
-        }));
+      const projectData: ProjectSummary[] = (data as ConnectedProjectRow[] || []).map((row) => ({
+        id: row.id,
+        projectName: row.project_name || 'Supabase Project',
+        supabaseUrl: row.supabase_url,
+        isActive: Boolean(row.is_active),
+        lastSyncedAt: row.last_synced_at,
+        githubEnabled: Boolean(row.github_enabled),
+        githubRepoUrl: row.github_repo_url,
+      }));
 
-        setProjects(projectData);
+      setProjects(projectData);
 
-        if (!activeProjectId && projectData.length > 0) {
-          const preferred = projectData.find((project) => project.isActive) ?? projectData[0];
-          setActiveProjectId(preferred.id);
-        }
+      // Set active project if not already set
+      if (!activeProjectId && projectData.length > 0) {
+        const preferred = projectData.find((project) => project.isActive) || projectData[0];
+        setActiveProjectId(preferred.id);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
+      setError(errorMessage);
+      setProjects([]);
+      setActiveProjectId(undefined);
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, activeProjectId]);
 
-        setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [supabase]);
+  useEffect(() => {
+    void fetchProjects();
+  }, [fetchProjects]);
 
   return {
     projects,
@@ -85,6 +98,7 @@ export function useProjects(): UseProjectsResult {
     setActiveProjectId,
     loading,
     error,
+    refresh: fetchProjects,
   };
 }
 

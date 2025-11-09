@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { AlertCircle, Info, AlertTriangle, Code, FileCode } from 'lucide-react';
 import type { Suggestion } from '../types';
 
@@ -30,8 +31,12 @@ function getSeverityStyles(severity: Suggestion['severity']) {
 
 /**
  * Individual suggestion card component
+ * Memoized to prevent re-renders when parent updates
  */
-export function SuggestionCard({ suggestion, onSelectTable }: SuggestionCardProps) {
+export const SuggestionCard = memo(function SuggestionCard({ 
+  suggestion, 
+  onSelectTable 
+}: SuggestionCardProps) {
   const handleClick = () => {
     if (onSelectTable && suggestion.tableId) {
       onSelectTable(suggestion.tableId);
@@ -109,4 +114,4 @@ export function SuggestionCard({ suggestion, onSelectTable }: SuggestionCardProp
       )}
     </div>
   );
-}
+});

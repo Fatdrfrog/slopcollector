@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getBrowserClient } from '@/lib/supabase/client';
+import { useCallback, useEffect, useState } from 'react';
+import { useSupabaseClient } from '@/lib/auth/hooks';
 import type { Suggestion, Table, CodeReference } from '../types';
 import type { DatabaseSchemaSnapshot, TableSchema, IndexSchema } from '@/lib/supabase/introspect';
 
@@ -34,8 +34,12 @@ type SuggestionRow = {
   status: string | null;
 };
 
+/**
+ * Hook to fetch dashboard data (tables, suggestions) for a project
+ * Uses singleton Supabase client via useSupabaseClient
+ */
 export function useDashboardData(projectId?: string): DashboardData {
-  const supabase = useMemo(() => getBrowserClient(), []);
+  const supabase = useSupabaseClient();
   const [tables, setTables] = useState<Table[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Database, RefreshCcw, Github } from 'lucide-react';
 import type { ProjectSummary } from '../hooks/useProjects';
 import { GitHubConnectDialog } from './GitHubConnectDialog';
@@ -22,8 +22,9 @@ interface HeaderProps {
 
 /**
  * Application header with controls
+ * Memoized to prevent re-renders unless props actually change
  */
-export function Header({
+export const Header = memo(function Header({
   tableCount,
   showSuggestions,
   onToggleSuggestions,
@@ -174,4 +175,4 @@ export function Header({
     </AnimatePresence>
     </>
   );
-}
+});

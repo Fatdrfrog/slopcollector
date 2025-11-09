@@ -1,16 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { getBrowserClient } from '@/lib/supabase/client';
+import { useSupabaseClient } from '@/lib/auth/hooks';
 
 interface UseSupabaseSessionResult {
   user: User | null;
   loading: boolean;
 }
 
+/**
+ * Hook to manage Supabase authentication session
+ * Uses singleton Supabase client via useSupabaseClient
+ */
 export function useSupabaseSession(): UseSupabaseSessionResult {
-  const supabase = useMemo(() => getBrowserClient(), []);
+  const supabase = useSupabaseClient();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 

@@ -43,6 +43,11 @@ export default function Home() {
   const [isGeneratingAdvice, setIsGeneratingAdvice] = useState(false);
   const [adviceError, setAdviceError] = useState<string>();
 
+  // Memoize table selection handler to prevent ERDCanvas re-renders
+  const handleTableSelect = useCallback((tableId: string | null) => {
+    setSelectedTable(tableId);
+  }, []);
+
   // Only show real data - no mock data fallback
   const tables = useMemo(() => remoteTables, [remoteTables]);
   const suggestions = useMemo(() => remoteSuggestions, [remoteSuggestions]);
@@ -218,7 +223,7 @@ export default function Home() {
               <ERDCanvas
                 tables={tables}
                 selectedTable={selectedTable}
-                onTableSelect={selectTable}
+                onTableSelect={handleTableSelect}
               />
             </div>
 

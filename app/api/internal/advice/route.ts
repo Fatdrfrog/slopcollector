@@ -87,15 +87,64 @@ export async function POST(request: Request) {
     );
   }
 
-  // Generate AI advice in background
-  // For now, we'll do it synchronously, but could move to edge function or queue
+  // Generate AI advice
   try {
-    await generateAIAdvice(serviceClient, project.id, job.id);
+    const { generateAIAdviceForProject, storeAdviceSuggestions } = await import('@/lib/ai/adviceService');
+    
+    // Generate suggestions
+    const result = await generateAIAdviceForProject(serviceClient, project.id, {
+      projectName: project.project_name || undefined,
+      skipRecentCheck: false, // Enforce cooldown
+    });
+
+    // Get snapshot for storage
+    const { data: snapshot } = await serviceClient
+      .from('schema_snapshots')
+      .select('id, tables_data, columns_data, indexes_data')
+      .eq('project_id', project.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!snapshot) {
+      throw new Error('No schema snapshot found');
+    }
+
+    // Store suggestions with deduplication and applied detection
+    const storeResult = await storeAdviceSuggestions(
+      serviceClient,
+      project.id,
+      snapshot.id,
+      result.suggestions,
+      {
+        schemaSnapshot: {
+          tables: (snapshot.tables_data as any[]) || [],
+          columns: (snapshot.columns_data as any[]) || [],
+          indexes: (snapshot.indexes_data as any[]) || [],
+        },
+      }
+    );
+
+    // Update job status
+    await serviceClient
+      .from('analysis_jobs')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        result_data: {
+          summary: result.summary,
+          stats: result.stats,
+          ...storeResult,
+        },
+        suggestions_count: storeResult.newSuggestions,
+      })
+      .eq('id', job.id);
     
     return NextResponse.json({
       jobId: job.id,
       status: 'completed',
       message: 'AI advice generated successfully',
+      result: storeResult,
     });
   } catch (adviceError) {
     console.error('AI advice generation error:', adviceError);
@@ -118,65 +167,5 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
-
-/**
- * Generate AI-powered index suggestions using OpenAI
- */
-async function generateAIAdvice(
-  serviceClient: SupabaseClient,
-  projectId: string,
-  jobId: string
-) {
-  const { generateAdviceForSchema } = await import('@/lib/ai/generateAdvice');
-  
-  // Get latest schema snapshot
-  const { data: snapshot } = await serviceClient
-    .from('schema_snapshots')
-    .select('*')
-    .eq('project_id', projectId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (!snapshot) {
-    throw new Error('No schema snapshot found. Please sync your project first.');
-  }
-
-  // Generate AI suggestions
-  const suggestions = await generateAdviceForSchema({
-    tables: snapshot.tables_data as any[],
-    indexes: snapshot.indexes_data as any[],
-  });
-
-  // Store suggestions in database
-  const suggestionRows = suggestions.map(s => ({
-    project_id: projectId,
-    table_name: s.tableName,
-    column_name: s.columnName || null,
-    severity: s.severity,
-    suggestion_type: s.type,
-    title: s.title,
-    description: s.description,
-    sql_snippet: s.sqlSnippet || null,
-    status: 'pending',
-    created_at: new Date().toISOString(),
-  }));
-
-  if (suggestionRows.length > 0) {
-    await serviceClient
-      .from('optimization_suggestions')
-      .insert(suggestionRows);
-  }
-
-  // Update job status
-  await serviceClient
-    .from('analysis_jobs')
-    .update({
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      result: { suggestions: suggestions.length },
-    })
-    .eq('id', jobId);
 }
 

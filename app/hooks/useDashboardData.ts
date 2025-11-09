@@ -83,19 +83,13 @@ export function useDashboardData(projectId?: string): DashboardData {
 
       const rowCount = table.rowEstimate ?? undefined;
       const columnCount = columnEntries.length;
-      const gridWidth = 400;
-      const gridHeight = 300;
-      const columnsPerRow = 3;
 
       return {
         id: table.tableName,
         name: table.tableName,
         columns: columnEntries,
         rowCount,
-        position: {
-          x: 120 + (index % columnsPerRow) * gridWidth,
-          y: 120 + Math.floor(index / columnsPerRow) * gridHeight,
-        },
+        position: { x: 0, y: 0 }, // Dagre will calculate actual position
         columnCount,
       } as Table;
     });

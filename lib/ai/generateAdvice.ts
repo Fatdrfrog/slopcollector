@@ -48,7 +48,7 @@ interface GenerateAdviceOptions {
   model?: string;
 }
 
-const DEFAULT_MODEL = 'gpt-4o';
+const DEFAULT_MODEL = 'gpt-5';
 
 const SYSTEM_PROMPT = `You are an elite PostgreSQL performance consultant specializing in Supabase database optimization. Your expertise includes:
 - Index strategy and query optimization
@@ -58,7 +58,8 @@ const SYSTEM_PROMPT = `You are an elite PostgreSQL performance consultant specia
 - Storage and performance tuning
 
 ## Your Task
-Analyze the provided database schema and generate actionable optimization recommendations.
+Analyze the provided database schema with ALL its tables, columns, indexes, and foreign key relationships.
+Generate actionable optimization recommendations based on the COMPLETE schema structure.
 
 ## Output Requirements
 Return a JSON object with this EXACT structure:
@@ -104,23 +105,24 @@ Return a JSON object with this EXACT structure:
 
 ## Focus Areas
 1. **Missing Indexes** (Priority 1)
-   - Foreign key columns without indexes
+   - Foreign key columns without indexes (CHECK foreignKeyTo field!)
    - Timestamp columns (created_at, updated_at) in large tables
    - Status/type enum columns
    - Columns in WHERE clauses
 
 2. **Performance Bottlenecks** (Priority 2)
-   - N+1 query patterns from unindexed FKs
+   - N+1 query patterns from unindexed FKs (use foreignKeys array!)
    - Full table scans on large tables
    - Inefficient JOIN operations
+   - Missing composite indexes for common query patterns
 
 3. **Security** (Priority 3)
    - Public tables without RLS policies
-   - Missing FK constraints
+   - Missing FK constraints (check isPrimaryKey and foreignKeyTo fields)
 
 4. **Best Practices** (Priority 4)
    - Dead columns consuming storage
-   - Opportunities for composite indexes
+   - Opportunities for composite indexes based on relationships
 
 ## Examples
 
@@ -181,7 +183,13 @@ export async function generateAdviceFromSnapshot(
 Database Schema Analysis:
 ${JSON.stringify(payload, null, 2)}
 
-Analyze this schema and provide optimization recommendations following the exact JSON structure specified. Focus on high-impact issues first.`;
+IMPORTANT: 
+- The schema includes ${payload.tableCount} tables, ${payload.indexCount} indexes, and ${payload.foreignKeyCount} foreign key relationships
+- Each table shows columns with isPrimaryKey and foreignKeyTo fields
+- The foreignKeys array shows ALL relationships across tables
+- Focus on foreign key columns that DON'T have indexes (major performance issue!)
+
+Analyze this COMPLETE schema and provide optimization recommendations following the exact JSON structure specified. Focus on high-impact issues first, especially missing indexes on foreign key columns.`;
 
   const response = await openai.chat.completions.create({
     model,
@@ -191,7 +199,7 @@ Analyze this schema and provide optimization recommendations following the exact
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
     ],
-    max_tokens: 2000, // Increased for detailed recommendations
+    max_completion_tokens: 2000, // Increased for detailed recommendations
   });
 
   const content = response.choices[0]?.message?.content;
@@ -299,27 +307,60 @@ function summarizeSnapshot(snapshot: DatabaseSchemaSnapshot) {
     {}
   );
 
+  // Extract foreign key relationships
+  const foreignKeys: Array<{
+    sourceTable: string;
+    sourceColumn: string;
+    targetTable: string;
+    targetColumn: string;
+  }> = [];
+
+  snapshot.columns.forEach((column) => {
+    if (column.foreignKeyTo) {
+      const [targetTable, targetColumn] = column.foreignKeyTo.split('.');
+      foreignKeys.push({
+        sourceTable: column.tableName,
+        sourceColumn: column.columnName,
+        targetTable,
+        targetColumn,
+      });
+    }
+  });
+
   return {
     tableCount: snapshot.tables.length,
     indexCount: snapshot.indexes.length,
-    topTables: snapshot.tables.slice(0, 12).map((table) => {
+    foreignKeyCount: foreignKeys.length,
+    foreignKeys,
+    tables: snapshot.tables.map((table) => {
       const key = `${table.schema}.${table.tableName}`;
-      const columns = (columnsByTable[key] ?? []).slice(0, 24).map((column) => ({
+      const tableColumns = columnsByTable[key] ?? [];
+      const tableIndexes = indexesByTable[key] ?? [];
+
+      const columns = tableColumns.map((column) => ({
         column: column.columnName,
         type: column.dataType,
         nullable: column.isNullable,
         default: column.columnDefault,
-        indexed: (indexesByTable[key] ?? [])
-          .some((idx) => idx.columns.some((name) => name.replace(/"/g, '').startsWith(column.columnName))),
+        isPrimaryKey: column.isPrimaryKey || false,
+        foreignKeyTo: column.foreignKeyTo || null,
+        indexed: tableIndexes.some((idx) => 
+          idx.columns.some((name) => name.replace(/"/g, '').startsWith(column.columnName))
+        ),
       }));
 
-      const indexes = (indexesByTable[key] ?? []).slice(0, 16).map((index) => ({
+      const indexes = tableIndexes.map((index) => ({
         name: index.indexName,
         unique: index.isUnique,
         primary: index.isPrimary,
         columns: index.columns,
         definition: getIndexDefinition(index as IndexSchema & IndexSchemaWithDefinition),
       }));
+
+      // Find foreign keys for this table
+      const tableForeignKeys = foreignKeys.filter(
+        (fk) => fk.sourceTable === table.tableName
+      );
 
       return {
         schema: table.schema,
@@ -328,6 +369,8 @@ function summarizeSnapshot(snapshot: DatabaseSchemaSnapshot) {
         totalBytes: getTableTotalBytes(table as TableSchema & TableSchemaWithSize),
         columns,
         indexes,
+        foreignKeys: tableForeignKeys,
+        hasForeignKeys: tableForeignKeys.length > 0,
       };
     }),
   };

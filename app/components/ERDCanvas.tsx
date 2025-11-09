@@ -3,7 +3,6 @@ import {
   ReactFlow,
   Background,
   MiniMap,
-  Controls,
   useNodesState,
   useEdgesState,
   BackgroundVariant,
@@ -94,6 +93,7 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
         minZoom={0.5}
         maxZoom={1.5}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        proOptions={{ hideAttribution: true }}
       >
         <Background
           gap={20}
@@ -101,12 +101,6 @@ export function ERDCanvas({ tables, selectedTable, onTableSelect }: ERDCanvasPro
           color="#1f1f1f"
           variant={BackgroundVariant.Dots}
           style={{ backgroundColor: '#0f0f0f' }}
-        />
-        
-        <Controls 
-          className="bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg shadow-lg"
-          position="bottom-left"
-          showInteractive={false}
         />
         
         <MiniMap

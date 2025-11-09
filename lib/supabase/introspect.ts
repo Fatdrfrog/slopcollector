@@ -13,6 +13,8 @@ export interface ColumnSchema {
   dataType: string;
   isNullable: boolean;
   columnDefault: string | null;
+  isPrimaryKey?: boolean;
+  foreignKeyTo?: string; // Format: "table.column"
 }
 
 export interface TableSchema {
@@ -39,7 +41,7 @@ export interface DatabaseSchemaSnapshot {
 
 /**
  * Introspect database using Supabase credentials
- * Uses pg_catalog views via Supabase's PostgREST interface
+ * Uses information_schema for complete column and FK information
  */
 export async function introspectSupabaseProject(
   supabaseUrl: string,
@@ -49,85 +51,121 @@ export async function introspectSupabaseProject(
   const client = createClient(supabaseUrl, supabaseKey);
 
   try {
-    // Fetch tables with row estimates
-    const tablesQuery = `
+    // Comprehensive query to get tables, columns, indexes, and foreign keys in one go
+    const schemaQuery = `
+      -- Get all tables
+      WITH tables AS (
+        SELECT 
+          t.table_schema as schema,
+          t.table_name,
+          obj_description((t.table_schema||'.'||t.table_name)::regclass, 'pg_class') as description
+        FROM information_schema.tables t
+        WHERE t.table_schema = '${targetSchema}'
+          AND t.table_type = 'BASE TABLE'
+      ),
+      -- Get all columns with details
+      columns AS (
+        SELECT 
+          c.table_schema as schema,
+          c.table_name,
+          c.column_name,
+          c.data_type,
+          c.is_nullable,
+          c.column_default,
+          c.ordinal_position,
+          CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key
+        FROM information_schema.columns c
+        LEFT JOIN (
+          SELECT ku.table_schema, ku.table_name, ku.column_name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage ku
+            ON tc.constraint_name = ku.constraint_name
+            AND tc.table_schema = ku.table_schema
+          WHERE tc.constraint_type = 'PRIMARY KEY'
+            AND tc.table_schema = '${targetSchema}'
+        ) pk ON c.table_schema = pk.table_schema 
+           AND c.table_name = pk.table_name 
+           AND c.column_name = pk.column_name
+        WHERE c.table_schema = '${targetSchema}'
+        ORDER BY c.table_name, c.ordinal_position
+      ),
+      -- Get foreign key relationships
+      foreign_keys AS (
+        SELECT
+          tc.table_schema as schema,
+          tc.table_name,
+          kcu.column_name,
+          ccu.table_name AS foreign_table_name,
+          ccu.column_name AS foreign_column_name,
+          tc.constraint_name
+        FROM information_schema.table_constraints AS tc
+        JOIN information_schema.key_column_usage AS kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.constraint_column_usage AS ccu
+          ON ccu.constraint_name = tc.constraint_name
+          AND ccu.table_schema = tc.table_schema
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND tc.table_schema = '${targetSchema}'
+      )
       SELECT 
-        schemaname as schema,
-        tablename as table_name,
-        NULL as description
-      FROM pg_catalog.pg_tables
-      WHERE schemaname = '${targetSchema}'
-      ORDER BY tablename;
+        json_build_object(
+          'tables', (SELECT json_agg(tables) FROM tables),
+          'columns', (SELECT json_agg(columns) FROM columns),
+          'foreign_keys', (SELECT json_agg(foreign_keys) FROM foreign_keys)
+        ) as result;
     `;
 
-    const { data: tablesData, error: tablesError } = await client
-      .rpc('sql', { query: tablesQuery })
-      .catch(() => ({ data: null, error: { message: 'RPC not available' } }));
-
-    // If RPC is not available, try direct query to information_schema
-    if (tablesError || !tablesData) {
-      // Fallback: Use REST API to get table list from OpenAPI spec
-      const tableNames = await getSimpleTableList(supabaseUrl, supabaseKey);
-      
-      const tables: TableSchema[] = tableNames.map(name => ({
-        schema: targetSchema,
-        tableName: name,
-        rowEstimate: null,
-        description: null,
-      }));
-
-      // Get columns for each table
-      const columns: ColumnSchema[] = [];
-      for (const tableName of tableNames) {
-        try {
-          const { data } = await client.from(tableName).select('*').limit(0);
-          // This won't give us full column info, but it's better than nothing
-        } catch (e) {
-          // Ignore errors for individual tables
-        }
-      }
-
-      return {
-        tables,
-        columns: [],
-        indexes: [],
-      };
+    let schemaData: any = null;
+    let schemaError: any = null;
+    
+    try {
+      const result = await client.rpc('sql', { query: schemaQuery });
+      schemaData = result.data;
+      schemaError = result.error;
+    } catch (e) {
+      schemaError = { message: 'RPC not available' };
     }
 
-    // Parse tables
-    const tables: TableSchema[] = (tablesData as any[]).map(row => ({
+    if (schemaError || !schemaData || !Array.isArray(schemaData) || schemaData.length === 0) {
+      console.error('Failed to fetch comprehensive schema, trying fallback');
+      return await introspectSupabaseProjectFallback(client, targetSchema, supabaseUrl, supabaseKey);
+    }
+
+    const result = schemaData[0]?.result;
+    if (!result) {
+      return await introspectSupabaseProjectFallback(client, targetSchema, supabaseUrl, supabaseKey);
+    }
+
+    const tables: TableSchema[] = (result.tables || []).map((row: any) => ({
       schema: row.schema || targetSchema,
       tableName: row.table_name,
       rowEstimate: null,
       description: row.description,
     }));
 
-    // Fetch columns for all tables
-    const columnsQuery = `
-      SELECT 
-        table_schema as schema,
-        table_name,
-        column_name,
-        data_type,
-        is_nullable,
-        column_default
-      FROM information_schema.columns
-      WHERE table_schema = '${targetSchema}'
-      ORDER BY table_name, ordinal_position;
-    `;
+    // Map foreign keys to columns
+    const foreignKeys = result.foreign_keys || [];
+    const fkMap = new Map<string, string>();
+    foreignKeys.forEach((fk: any) => {
+      const key = `${fk.schema}.${fk.table_name}.${fk.column_name}`;
+      const value = `${fk.foreign_table_name}.${fk.foreign_column_name}`;
+      fkMap.set(key, value);
+    });
 
-    const { data: columnsData } = await client
-      .rpc('sql', { query: columnsQuery })
-      .catch(() => ({ data: [] }));
-
-    const columns: ColumnSchema[] = ((columnsData as any[]) || []).map(row => ({
-      schema: row.schema || targetSchema,
-      tableName: row.table_name,
-      columnName: row.column_name,
-      dataType: row.data_type,
-      isNullable: row.is_nullable === 'YES',
-      columnDefault: row.column_default,
-    }));
+    const columns: ColumnSchema[] = (result.columns || []).map((row: any) => {
+      const key = `${row.schema}.${row.table_name}.${row.column_name}`;
+      return {
+        schema: row.schema || targetSchema,
+        tableName: row.table_name,
+        columnName: row.column_name,
+        dataType: row.data_type,
+        isNullable: row.is_nullable === 'YES',
+        columnDefault: row.column_default,
+        isPrimaryKey: row.is_primary_key || false,
+        foreignKeyTo: fkMap.get(key),
+      };
+    });
 
     // Fetch indexes
     const indexesQuery = `
@@ -141,9 +179,13 @@ export async function introspectSupabaseProject(
       ORDER BY tablename, indexname;
     `;
 
-    const { data: indexesData } = await client
-      .rpc('sql', { query: indexesQuery })
-      .catch(() => ({ data: [] }));
+    let indexesData: any[] = [];
+    try {
+      const result = await client.rpc('sql', { query: indexesQuery });
+      indexesData = result.data || [];
+    } catch (e) {
+      console.error('Failed to fetch indexes:', e);
+    }
 
     const indexes: IndexSchema[] = ((indexesData as any[]) || []).map(row => ({
       schema: row.schema || targetSchema,
@@ -200,6 +242,70 @@ function extractColumnsFromIndexDef(indexDef: string): string[] {
     .split(',')
     .map(col => col.trim().replace(/"/g, ''))
     .filter(Boolean);
+}
+
+/**
+ * Fallback introspection when comprehensive query fails
+ */
+async function introspectSupabaseProjectFallback(
+  client: any,
+  targetSchema: string,
+  supabaseUrl: string,
+  supabaseKey: string
+): Promise<DatabaseSchemaSnapshot> {
+  try {
+    const tableNames = await getSimpleTableList(supabaseUrl, supabaseKey);
+    
+    const tables: TableSchema[] = tableNames.map(name => ({
+      schema: targetSchema,
+      tableName: name,
+      rowEstimate: null,
+      description: null,
+    }));
+
+    // Try to get columns through simple queries
+    const columns: ColumnSchema[] = [];
+    for (const tableName of tableNames.slice(0, 20)) { // Limit to avoid timeouts
+      try {
+        const colQuery = `
+          SELECT column_name, data_type, is_nullable, column_default
+          FROM information_schema.columns
+          WHERE table_schema = '${targetSchema}' AND table_name = '${tableName}'
+          ORDER BY ordinal_position;
+        `;
+        const result = await client.rpc('sql', { query: colQuery });
+        const data = result.data || [];
+        
+        if (Array.isArray(data)) {
+          data.forEach((row: any) => {
+            columns.push({
+              schema: targetSchema,
+              tableName,
+              columnName: row.column_name,
+              dataType: row.data_type,
+              isNullable: row.is_nullable === 'YES',
+              columnDefault: row.column_default,
+            });
+          });
+        }
+      } catch (e) {
+        console.error(`Failed to fetch columns for ${tableName}:`, e);
+      }
+    }
+
+    return {
+      tables,
+      columns,
+      indexes: [],
+    };
+  } catch (error) {
+    console.error('Fallback also failed:', error);
+    return {
+      tables: [],
+      columns: [],
+      indexes: [],
+    };
+  }
 }
 
 /**

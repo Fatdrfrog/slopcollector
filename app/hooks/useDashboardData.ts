@@ -76,13 +76,14 @@ export function useDashboardData(projectId?: string): DashboardData {
         type: column.dataType,
         nullable: column.isNullable,
         indexed: indexColumns[key]?.has(column.columnName) ?? false,
-        primaryKey: false,
+        primaryKey: column.isPrimaryKey ?? false,
+        foreignKey: column.foreignKeyTo, // Add FK relationship
       }));
 
       const rowCount = table.rowEstimate ?? undefined;
       const columnCount = columnEntries.length;
-      const gridWidth = 360;
-      const gridHeight = 240;
+      const gridWidth = 400;
+      const gridHeight = 300;
       const columnsPerRow = 3;
 
       return {
@@ -157,10 +158,10 @@ export function useDashboardData(projectId?: string): DashboardData {
         return;
       }
 
-      // Build schema from stored data
+      // Build schema from stored data - ensure we pass columns!
       const schema: DatabaseSchemaSnapshot = {
         tables: (snapshot.tables_data as TableSchema[]) || [],
-        columns: [],
+        columns: (snapshot.columns_data as any[]) || [], 
         indexes: (snapshot.indexes_data as IndexSchema[]) || [],
       };
 

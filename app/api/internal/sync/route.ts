@@ -61,12 +61,13 @@ export async function POST(request: Request) {
 
     console.log(`Found ${schema.tables.length} tables, ${schema.columns.length} columns, ${schema.indexes.length} indexes`);
 
-    // Store schema snapshot
+    // Store schema snapshot with columns
     const { data: snapshot, error: snapshotError } = await serviceClient
       .from('schema_snapshots')
       .insert({
         project_id: project.id,
         tables_data: schema.tables,
+        columns_data: schema.columns, // Store columns!
         indexes_data: schema.indexes,
         relationships_data: [], // Will implement later
         created_at: new Date().toISOString(),

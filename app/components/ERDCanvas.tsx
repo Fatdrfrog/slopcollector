@@ -10,6 +10,8 @@ import {
   BackgroundVariant,
   type Node,
   type NodeTypes,
+  type Edge,
+  type Connection,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { TableNode, type TableNodeData } from './TableNode';
@@ -63,8 +65,11 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
     const layouted = getLayoutedElements(newNodes, baseEdges, 'TB');
     const orientedEdges = generateEdgesFromTables(tables, layouted.nodePositions);
 
-    setNodes(layouted.nodes);
-    setEdges(orientedEdges);
+    // Batch updates using requestAnimationFrame to ensure DOM is updated
+    requestAnimationFrame(() => {
+      setNodes(layouted.nodes);
+      setEdges(orientedEdges);
+    });
   }, [tables, memoizedOnTableSelect, suggestions, setNodes, setEdges]);
 
   // Fast update: Only update selection state without recalculating layout
@@ -118,6 +123,31 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
     onTableSelect(null);
   }, [onTableSelect]);
 
+  // Validate edge connections to prevent errors with missing handles
+  const isValidConnection = useCallback((connection: Edge | Connection) => {
+    const sourceNode = getNode(connection.source);
+    const targetNode = getNode(connection.target);
+    
+    // Ensure both nodes exist
+    if (!sourceNode || !targetNode) {
+      return false;
+    }
+    
+    // Valid handle IDs
+    const validSourceHandles = ['left', 'right', 'top', 'bottom'];
+    const validTargetHandles = ['left-target', 'right-target', 'top-target', 'bottom-target'];
+    
+    // Validate handles exist (handle undefined as valid)
+    const hasValidSourceHandle = connection.sourceHandle === undefined || 
+                                 connection.sourceHandle === null ||
+                                 validSourceHandles.includes(connection.sourceHandle);
+    const hasValidTargetHandle = connection.targetHandle === undefined || 
+                                 connection.targetHandle === null ||
+                                 validTargetHandles.includes(connection.targetHandle);
+    
+    return hasValidSourceHandle && hasValidTargetHandle;
+  }, [getNode]);
+
   const handleRelayout = useCallback(() => {
     const newNodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect, suggestions);
     const baseEdges = generateEdgesFromTables(tables);
@@ -127,13 +157,16 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
     const layouted = getLayoutedElements(newNodes, baseEdges, 'TB');
     const orientedEdges = generateEdgesFromTables(tables, layouted.nodePositions);
 
-    setNodes(layouted.nodes);
-    setEdges(orientedEdges);
-    
-    // Fit view after relayout
-    setTimeout(() => {
-      fitView({ padding: 0.2, duration: 400 });
-    }, 100);
+    // Batch updates using requestAnimationFrame
+    requestAnimationFrame(() => {
+      setNodes(layouted.nodes);
+      setEdges(orientedEdges);
+      
+      // Fit view after layout is complete
+      setTimeout(() => {
+        fitView({ padding: 0.2, duration: 400 });
+      }, 50);
+    });
   }, [tables, selectedTable, memoizedOnTableSelect, suggestions, setNodes, setEdges, fitView]);
 
   const getMiniMapNodeColor = useCallback((node: Node<TableNodeData>) => {
@@ -159,6 +192,7 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
         onPaneClick={handlePaneClick}
+        isValidConnection={isValidConnection}
         fitView
         fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
         minZoom={0.1}

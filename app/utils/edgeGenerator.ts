@@ -24,7 +24,7 @@ export function generateEdgesFromTables(
   let edgeCount = 0;
 
   const getHandlePositions = (sourceId: string, targetId: string) => {
-    const defaultHandles = { sourceHandle: 'bottom', targetHandle: 'top' };
+    const defaultHandles = { sourceHandle: 'bottom', targetHandle: 'top-target' };
 
     if (!nodePositions) {
       return defaultHandles;
@@ -43,16 +43,16 @@ export function generateEdgesFromTables(
     if (Math.abs(dx) > Math.abs(dy)) {
       // Horizontal orientation
       if (dx > 0) {
-        return { sourceHandle: 'right', targetHandle: 'left' };
+        return { sourceHandle: 'right', targetHandle: 'left-target' };
       }
-      return { sourceHandle: 'left', targetHandle: 'right' };
+      return { sourceHandle: 'left', targetHandle: 'right-target' };
     }
 
     // Vertical orientation
     if (dy > 0) {
-      return { sourceHandle: 'bottom', targetHandle: 'top' };
+      return { sourceHandle: 'bottom', targetHandle: 'top-target' };
     }
-    return { sourceHandle: 'top', targetHandle: 'bottom' };
+    return { sourceHandle: 'top', targetHandle: 'bottom-target' };
   };
 
   tables.forEach((table) => {

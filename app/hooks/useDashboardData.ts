@@ -80,6 +80,13 @@ export function useDashboardData(projectId?: string): DashboardData {
         primaryKey: column.isPrimaryKey ?? false,
         foreignKey: column.foreignKeyTo, // Add FK relationship
       }));
+      
+      // Debug: Log FK columns found
+      const fkColumns = columnEntries.filter(c => c.foreignKey);
+      if (fkColumns.length > 0) {
+        console.log(`🔗 Table ${table.tableName} has ${fkColumns.length} FK columns:`, 
+          fkColumns.map(c => `${c.name} → ${c.foreignKey}`));
+      }
 
       const rowCount = table.rowEstimate ?? undefined;
       const columnCount = columnEntries.length;

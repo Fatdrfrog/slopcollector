@@ -9,12 +9,18 @@ import { SuggestionsPanel } from './components/SuggestionsPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { EmptyState } from './components/EmptyState';
 import { StatusIndicator } from './components/StatusIndicator';
+import { DebugPanel } from './components/DebugPanel';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTableNavigation } from './hooks/useTableNavigation';
 import { useDashboardData } from './hooks/useDashboardData';
 import { useProjects } from './hooks/useProjects';
 import { useSupabaseSession } from './hooks/useSupabaseSession';
 import { useSupabaseClient } from '@/lib/auth/hooks';
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
 
 /**
  * Main application component for the ERD Panel
@@ -247,21 +253,23 @@ export default function Home() {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <ResizablePanelGroup direction="horizontal" className="flex-1 flex overflow-hidden">
         {tables.length === 0 ? (
           <EmptyState onSync={handleSync} isSyncing={loading} />
         ) : (
           <>
-            <div className="flex-1 relative">
+            <ResizablePanel defaultSize={75}>
               <ERDCanvas
                 tables={tables}
                 selectedTable={selectedTable}
                 onTableSelect={handleTableSelect}
                 suggestions={suggestions}
               />
-            </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
 
             {showSuggestions && (
+              <ResizablePanel defaultSize={25}>
               <motion.div
                 initial={{ x: 420, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
@@ -274,10 +282,11 @@ export default function Home() {
                   onSelectTable={handleTableSelect}
                 />
               </motion.div>
+              </ResizablePanel>
             )}
           </>
         )}
-      </div>
+      </ResizablePanelGroup>
 
       {/* Command Palette */}
       {showCommandPalette && (
@@ -301,6 +310,15 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
+
+      {/* Debug Panel (development only) */}
+      <DebugPanel
+        activeProjectId={activeProjectId}
+        projectsCount={projects.length}
+        suggestionsCount={suggestions.length}
+        tablesCount={tables.length}
+        userId={user?.id}
+      />
     </div>
   );
 }

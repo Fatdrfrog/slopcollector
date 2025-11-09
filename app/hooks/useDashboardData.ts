@@ -108,16 +108,21 @@ export function useDashboardData(projectId?: string): DashboardData {
 
   const fetchSuggestions = useCallback(
     async (projectId: string) => {
+      console.log('📊 Fetching suggestions for project:', projectId);
+      
       const { data, error: queryError } = await supabase
         .from('optimization_suggestions')
         .select('*')
         .eq('project_id', projectId)
-        .eq('status', 'pending');
+        .in('status', ['pending', 'applied', 'dismissed']) // Show all active suggestions
+        .order('created_at', { ascending: false });
 
       if (queryError) {
+        console.error('❌ Error fetching suggestions:', queryError);
         throw queryError;
       }
 
+      console.log(`✅ Found ${data?.length || 0} suggestions for project ${projectId}`);
       return (data ?? []) as SuggestionRow[];
     },
     [supabase]
@@ -268,9 +273,10 @@ export function useDashboardData(projectId?: string): DashboardData {
         };
       });
 
+      console.log(`✅ Mapped ${mappedSuggestions.length} suggestions with code references`);
       setSuggestions(mappedSuggestions);
     } catch (err) {
-      console.error(err);
+      console.error('❌ Dashboard data fetch error:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);

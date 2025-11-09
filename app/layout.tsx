@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/app/components/ui/sonner";
+import { ErrorBoundary } from './components/ErrorBoundary';
 import "./globals.css";
 
 const geistMono = Geist_Mono({
@@ -24,19 +25,21 @@ export default function RootLayout({
       <body
         className={`${geistMono.variable} antialiased font-mono bg-[#1a1a1a] text-white`}
       >
-        {children}
-        <Toaster 
-          richColors 
-          closeButton 
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: '#2a2a2a',
-              border: '1px solid #3a3a3a',
-              color: '#fff',
-            },
-          }}
-        />
+        <ErrorBoundary>
+          {children}
+          <Toaster 
+            richColors 
+            closeButton 
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: '#2a2a2a',
+                border: '1px solid #3a3a3a',
+                color: '#fff',
+              },
+            }}
+          />
+        </ErrorBoundary>
       </body>
     </html>
   );

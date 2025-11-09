@@ -5,10 +5,13 @@ interface KeyboardShortcutHandlers {
   onEscape?: () => void;
   onTab?: () => void;
   onCtrlB?: () => void;
+  onCommandR?: () => void;
+  onCommandG?: () => void;
 }
 
 /**
  * Custom hook to handle keyboard shortcuts for the application
+ * Enhanced with more productivity shortcuts
  * @param handlers - Object containing callback functions for each shortcut
  * @param dependencies - Array of dependencies to re-register shortcuts
  */
@@ -28,6 +31,18 @@ export function useKeyboardShortcuts(
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault();
         handlers.onCtrlB?.();
+      }
+
+      // Command/Ctrl + R - Refresh/Sync schema
+      if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+        e.preventDefault();
+        handlers.onCommandR?.();
+      }
+
+      // Command/Ctrl + G - Generate AI advice
+      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
+        e.preventDefault();
+        handlers.onCommandG?.();
       }
       
       // Escape - Clear selection/close modals

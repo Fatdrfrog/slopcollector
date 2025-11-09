@@ -86,41 +86,43 @@ export function Header({
             ) : null}
           </div>
 
-          <button
-            onClick={() => onRefresh()}
-            disabled={isSyncing}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-300 bg-[#121212] border border-gray-800 rounded-md hover:bg-gray-800 transition-colors disabled:opacity-60"
-          >
-            <RefreshCcw className="w-3.5 h-3.5" />
-            {isSyncing ? 'Syncing…' : 'Refresh'}
-          </button>
+        <button
+          onClick={() => onRefresh()}
+          disabled={isSyncing}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-300 bg-[#121212] border border-gray-800 rounded-md hover:bg-gray-800 transition-colors disabled:opacity-60"
+          title="Sync schema from Supabase (⌘R)"
+        >
+          <RefreshCcw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+          {isSyncing ? 'Syncing…' : 'Refresh'}
+        </button>
 
-          <button
-            onClick={() => onGenerateAdvice()}
-            disabled={isGeneratingAdvice}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-200 bg-indigo-900/30 border border-indigo-800 rounded-md hover:bg-indigo-900/60 transition-colors disabled:opacity-60"
+        <button
+          onClick={() => onGenerateAdvice()}
+          disabled={isGeneratingAdvice || !activeProjectId}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-200 bg-indigo-900/30 border border-indigo-800 rounded-md hover:bg-indigo-900/60 transition-colors disabled:opacity-60"
+          title="Generate AI optimization suggestions (⌘G)"
+        >
+          <svg
+            className={`w-3.5 h-3.5 ${isGeneratingAdvice ? 'animate-spin' : ''}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <svg
-              className="w-3.5 h-3.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 3v2" />
-              <path d="m16.2 7.8 1.4-1.4" />
-              <path d="M21 12h-2" />
-              <path d="m16.2 16.2 1.4 1.4" />
-              <path d="M12 19v2" />
-              <path d="m6.4 17.6 1.4-1.4" />
-              <path d="M5 12H3" />
-              <path d="m6.4 6.4 1.4 1.4" />
-              <path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z" />
-            </svg>
-            {isGeneratingAdvice ? 'Generating…' : 'Run AI Advice'}
-          </button>
+            <path d="M12 3v2" />
+            <path d="m16.2 7.8 1.4-1.4" />
+            <path d="M21 12h-2" />
+            <path d="m16.2 16.2 1.4 1.4" />
+            <path d="M12 19v2" />
+            <path d="m6.4 17.6 1.4-1.4" />
+            <path d="M5 12H3" />
+            <path d="m6.4 6.4 1.4 1.4" />
+            <path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z" />
+          </svg>
+          {isGeneratingAdvice ? 'Generating…' : 'Run AI Advice'}
+        </button>
         </div>
       </div>
 

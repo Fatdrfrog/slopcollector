@@ -174,7 +174,7 @@ export default function Home() {
     setShowSuggestions(prev => !prev);
   }, []);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (enhanced)
   useKeyboardShortcuts(
     {
       onCommandK: () => setShowCommandPalette(true),
@@ -184,8 +184,10 @@ export default function Home() {
       },
       onTab: selectNextTable,
       onCtrlB: toggleSuggestions, // Ctrl+B to toggle suggestions panel
+      onCommandR: handleSync, // Cmd/Ctrl+R to refresh
+      onCommandG: handleGenerateAdvice, // Cmd/Ctrl+G to generate AI advice
     },
-    [selectNextTable, clearSelection, toggleSuggestions]
+    [selectNextTable, clearSelection, toggleSuggestions, handleSync, handleGenerateAdvice]
   );
 
   const selectedTableData = tables.find(t => t.id === selectedTable);

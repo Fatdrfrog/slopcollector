@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { Info, TrendingUp } from 'lucide-react';
 import type { Suggestion, Table } from '../types';
 import { SuggestionCard } from './SuggestionCard';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface SuggestionsPanelProps {
   suggestions: Suggestion[];
@@ -10,27 +12,34 @@ interface SuggestionsPanelProps {
 
 /**
  * Panel displaying database optimization suggestions
+ * Optimized with memoization to prevent unnecessary re-renders
  */
 export function SuggestionsPanel({ suggestions, selectedTable, onSelectTable }: SuggestionsPanelProps) {
-  // Filter suggestions by selected table
-  const filteredSuggestions = selectedTable
-    ? suggestions.filter(s => s.tableId === selectedTable.id)
-    : suggestions;
+  // Memoize filtered suggestions to prevent recalculation on every render
+  const filteredSuggestions = useMemo(
+    () => selectedTable ? suggestions.filter(s => s.tableId === selectedTable.id) : suggestions,
+    [suggestions, selectedTable]
+  );
 
-  // Group suggestions by severity
-  const groupedSuggestions = filteredSuggestions.reduce((acc, suggestion) => {
-    if (!acc[suggestion.severity]) {
-      acc[suggestion.severity] = [];
-    }
-    acc[suggestion.severity].push(suggestion);
-    return acc;
-  }, {} as Record<string, Suggestion[]>);
+  // Memoize grouped suggestions
+  const groupedSuggestions = useMemo(() => {
+    return filteredSuggestions.reduce((acc, suggestion) => {
+      if (!acc[suggestion.severity]) {
+        acc[suggestion.severity] = [];
+      }
+      acc[suggestion.severity].push(suggestion);
+      return acc;
+    }, {} as Record<string, Suggestion[]>);
+  }, [filteredSuggestions]);
 
   const severityOrder: Suggestion['severity'][] = ['error', 'warning', 'info'];
-  const sortedGroups = severityOrder.filter(severity => groupedSuggestions[severity]);
+  const sortedGroups = useMemo(
+    () => severityOrder.filter(severity => groupedSuggestions[severity]),
+    [groupedSuggestions]
+  );
 
   return (
-    <div className="w-[420px] h-full border-l border-gray-800 bg-linear-to-b from-[#1a1a1a] to-[#151515] flex flex-col overflow-hidden">
+    <div className="w-[420px] h-full border-l border-gray-800 bg-gradient-to-b from-[#1a1a1a] to-[#151515] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-gray-800 bg-[#0f0f0f]/60 backdrop-blur-sm flex-shrink-0">
         <h2 className="text-gray-100 flex items-center gap-2.5">
@@ -53,11 +62,11 @@ export function SuggestionsPanel({ suggestions, selectedTable, onSelectTable }: 
       </div>
 
       {/* Suggestions List */}
-      <div className="flex-1 overflow-y-auto">
+      <ScrollArea className="flex-1">
         {filteredSuggestions.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="p-4 space-y-3">
+          <div className="p-4 space-y-3 pr-3">
             {sortedGroups.map(severity => (
               <SuggestionGroup
                 key={severity}
@@ -68,7 +77,7 @@ export function SuggestionsPanel({ suggestions, selectedTable, onSelectTable }: 
             ))}
           </div>
         )}
-      </div>
+      </ScrollArea>
 
       {/* Summary Stats */}
       {filteredSuggestions.length > 0 && (

@@ -213,7 +213,8 @@ export function ConnectProjectDialog({
                       placeholder="https://xxx.supabase.co"
                       autoComplete="url"
                       disabled={connecting}
-                      className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                      autoFocus
+                      className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-2 focus:ring-[#7ed321]/20 transition-all"
                       {...field}
                     />
                   </FormControl>
@@ -236,7 +237,7 @@ export function ConnectProjectDialog({
                       placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                       autoComplete="off"
                       disabled={connecting}
-                      className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321] text-xs"
+                      className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-2 focus:ring-[#7ed321]/20 transition-all text-xs"
                       {...field}
                     />
                   </FormControl>

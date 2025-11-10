@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -47,7 +47,7 @@ const signUpSchema = z.object({
 type SignInFormValues = z.infer<typeof signInSchema>;
 type SignUpFormValues = z.infer<typeof signUpSchema>;
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useSupabaseClient();
@@ -85,8 +85,15 @@ export default function LoginPage() {
 
       if (data.user) {
         authToasts.signInSuccess();
-        router.push('/');
-        router.refresh();
+        
+        // Redirect to returnTo path if specified, otherwise dashboard
+        const returnTo = searchParams?.get('returnTo');
+        if (returnTo && returnTo !== '/') {
+          window.location.href = returnTo;
+        } else {
+          router.push('/');
+          router.refresh();
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to sign in';
@@ -327,7 +334,7 @@ export default function LoginPage() {
                               placeholder="Enter your password"
                               disabled={loading}
                               autoComplete="current-password"
-                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-2 focus:ring-[#7ed321]/20 transition-all"
                             />
                           </FormControl>
                           <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
@@ -344,20 +351,22 @@ export default function LoginPage() {
                       </a>
                     </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Signing in...
-                        </>
-                      ) : (
-                        'Sign In'
-                      )}
-                    </Button>
+                    <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                      <Button
+                        type="submit"
+                        className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold transition-all shadow-lg hover:shadow-xl hover:shadow-[#7ed321]/20"
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Signing in...
+                          </>
+                        ) : (
+                          'Sign In'
+                        )}
+                      </Button>
+                    </motion.div>
                   </form>
                 </Form>
 
@@ -389,7 +398,7 @@ export default function LoginPage() {
                               placeholder="you@example.com"
                               autoComplete="email"
                               disabled={loading}
-                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-2 focus:ring-[#7ed321]/20 transition-all"
                               {...field}
                             />
                           </FormControl>
@@ -411,7 +420,7 @@ export default function LoginPage() {
                               placeholder="Create a strong password"
                               disabled={loading}
                               autoComplete="new-password"
-                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-2 focus:ring-[#7ed321]/20 transition-all"
                             />
                           </FormControl>
                           <PasswordStrength password={field.value} />
@@ -435,7 +444,7 @@ export default function LoginPage() {
                               placeholder="Confirm your password"
                               disabled={loading}
                               autoComplete="new-password"
-                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-2 focus:ring-[#7ed321]/20 transition-all"
                             />
                           </FormControl>
                           <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
@@ -447,20 +456,22 @@ export default function LoginPage() {
                       By signing up, you agree to analyze your Supabase projects with AI.
                     </FormDescription>
 
-                    <Button
-                      type="submit"
-                      className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Creating account...
-                        </>
-                      ) : (
-                        'Create Account'
-                      )}
-                    </Button>
+                    <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                      <Button
+                        type="submit"
+                        className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold transition-all shadow-lg hover:shadow-xl hover:shadow-[#7ed321]/20"
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Creating account...
+                          </>
+                        ) : (
+                          'Create Account'
+                        )}
+                      </Button>
+                    </motion.div>
                   </form>
                 </Form>
 
@@ -480,5 +491,17 @@ export default function LoginPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#7ed321]"></div>
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   );
 }

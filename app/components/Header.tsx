@@ -2,8 +2,10 @@ import { memo, useState } from 'react';
 import { Database, RefreshCcw, Github, Plus } from 'lucide-react';
 import type { ProjectSummary } from '../hooks/useProjects';
 import { GitHubConnectDialog } from './GitHubConnectDialog';
+import { GitHubRepoPicker } from './GitHubRepoPicker';
 import { ConnectProjectDialog } from './ConnectProjectDialog';
 import { AnimatePresence } from 'motion/react';
+import { useSupabaseSession } from '../hooks/useSupabaseSession';
 
 interface HeaderProps {
   tableCount: number;
@@ -42,7 +44,9 @@ export const Header = memo(function Header({
 }: HeaderProps) {
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
+  const { user } = useSupabaseSession();
   const activeProject = projects.find((p) => p.id === activeProjectId);
+  const isGitHubUser = user?.app_metadata?.provider === 'github';
 
   return (
     <>
@@ -169,18 +173,28 @@ export const Header = memo(function Header({
       </div>
     </header>
 
-    {/* GitHub Connect Dialog */}
+    {/* GitHub Connect Dialog - Use repo picker for GitHub OAuth users */}
     <AnimatePresence>
       {showGitHubDialog && activeProject && (
-        <GitHubConnectDialog
-          projectId={activeProject.id}
-          projectName={activeProject.projectName}
-          onClose={() => setShowGitHubDialog(false)}
-          onSuccess={() => {
-            // Refresh to update GitHub status
-            onRefresh();
-          }}
-        />
+        isGitHubUser ? (
+          <GitHubRepoPicker
+            projectId={activeProject.id}
+            projectName={activeProject.projectName}
+            onClose={() => setShowGitHubDialog(false)}
+            onSuccess={() => {
+              onRefresh();
+            }}
+          />
+        ) : (
+          <GitHubConnectDialog
+            projectId={activeProject.id}
+            projectName={activeProject.projectName}
+            onClose={() => setShowGitHubDialog(false)}
+            onSuccess={() => {
+              onRefresh();
+            }}
+          />
+        )
       )}
     </AnimatePresence>
 

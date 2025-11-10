@@ -20,10 +20,15 @@ export function OAuthButtons({ redirectTo = '/' }: OAuthButtonsProps) {
   const handleOAuth = async (provider: 'google' | 'github') => {
     setLoadingProvider(provider);
     try {
+      // Get returnTo from URL if present
+      const urlParams = new URLSearchParams(window.location.search);
+      const returnTo = urlParams.get('returnTo') || redirectTo;
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnTo)}`,
+          scopes: provider === 'github' ? 'read:user user:email repo' : undefined,
         },
       });
 

@@ -60,6 +60,9 @@ export async function GET(request: NextRequest) {
 
       if (profileError && profileError.code === 'PGRST116') {
         // Profile doesn't exist, create it
+        // Store GitHub access token if available (for GitHub OAuth)
+        const githubAccessToken = user.app_metadata?.provider_token;
+        
         const { error: insertError } = await supabase.from('user_profiles').insert({
           id: user.id,
           email: user.email,
@@ -69,6 +72,12 @@ export async function GET(request: NextRequest) {
 
         if (insertError) {
           console.error('Failed to create user profile:', insertError);
+        }
+        
+        // Store GitHub token separately if needed for future use
+        if (githubAccessToken && user.app_metadata?.provider === 'github') {
+          // You could store this in user_profiles or a separate table
+          console.log('GitHub OAuth: User authenticated with repo access');
         }
       }
 

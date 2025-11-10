@@ -11,6 +11,7 @@ import { EmptyState } from './components/EmptyState';
 import { StatusIndicator } from './components/StatusIndicator';
 import { DebugPanel } from './components/DebugPanel';
 import { NoSuggestionsPrompt } from './components/NoSuggestionsPrompt';
+import { ConnectProjectDialog } from './components/ConnectProjectDialog';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTableNavigation } from './hooks/useTableNavigation';
 import { useDashboardData } from './hooks/useDashboardData';
@@ -51,6 +52,7 @@ export default function Home() {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [isGeneratingAdvice, setIsGeneratingAdvice] = useState(false);
   const [adviceError, setAdviceError] = useState<string>();
+  const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error' | 'loading';
     message: string;
@@ -76,6 +78,17 @@ export default function Home() {
       setIsConnected(true);
     }
   }, [user, isConnected]);
+
+  // Auto-show ConnectProjectDialog for first-time users (onboarding)
+  useEffect(() => {
+    if (!projectsLoading && !authLoading && user && projects.length === 0) {
+      // Small delay to let the UI settle
+      const timer = setTimeout(() => {
+        setShowConnectDialog(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [projectsLoading, authLoading, user, projects.length]);
 
   const handleSignOut = useCallback(async () => {
     await supabaseClient.auth.signOut();
@@ -353,6 +366,15 @@ export default function Home() {
         suggestionsCount={suggestions.length}
         tablesCount={tables.length}
         userId={user?.id}
+      />
+
+      {/* Connect Project Dialog (auto-shown for onboarding) */}
+      <ConnectProjectDialog
+        open={showConnectDialog}
+        onOpenChange={setShowConnectDialog}
+        onSuccess={() => {
+          refresh();
+        }}
       />
     </div>
   );

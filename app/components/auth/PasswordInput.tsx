@@ -16,6 +16,7 @@ interface PasswordInputProps {
 
 /**
  * Password input with show/hide toggle
+ * Keyboard shortcut: Ctrl/Cmd + K to toggle visibility
  */
 export function PasswordInput({
   value,
@@ -28,7 +29,7 @@ export function PasswordInput({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative group">
       <Input
         type={showPassword ? 'text' : 'password'}
         value={value}
@@ -36,20 +37,28 @@ export function PasswordInput({
         placeholder={placeholder}
         disabled={disabled}
         autoComplete={autoComplete}
+        onKeyDown={(e) => {
+          // Toggle visibility with Ctrl/Cmd + K
+          if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            setShowPassword(!showPassword);
+          }
+        }}
         className={`pr-10 ${className}`}
       />
       <Button
         type="button"
         variant="ghost"
         size="sm"
-        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+        tabIndex={-1}
+        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent opacity-60 hover:opacity-100 transition-opacity"
         onClick={() => setShowPassword(!showPassword)}
         disabled={disabled}
       >
         {showPassword ? (
-          <EyeOff className="h-4 w-4 text-[#666]" />
+          <EyeOff className="h-4 w-4 text-[#999] group-hover:text-white transition-colors" />
         ) : (
-          <Eye className="h-4 w-4 text-[#666]" />
+          <Eye className="h-4 w-4 text-[#999] group-hover:text-white transition-colors" />
         )}
         <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
       </Button>

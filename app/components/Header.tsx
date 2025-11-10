@@ -1,7 +1,8 @@
 import { memo, useState } from 'react';
-import { Database, RefreshCcw, Github } from 'lucide-react';
+import { Database, RefreshCcw, Github, Plus } from 'lucide-react';
 import type { ProjectSummary } from '../hooks/useProjects';
 import { GitHubConnectDialog } from './GitHubConnectDialog';
+import { ConnectProjectDialog } from './ConnectProjectDialog';
 import { AnimatePresence } from 'motion/react';
 
 interface HeaderProps {
@@ -40,6 +41,7 @@ export const Header = memo(function Header({
   isGeneratingAdvice,
 }: HeaderProps) {
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
+  const [showConnectDialog, setShowConnectDialog] = useState(false);
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
   return (
@@ -71,6 +73,14 @@ export const Header = memo(function Header({
                 ))
               )}
             </select>
+            <button
+              onClick={() => setShowConnectDialog(true)}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-[#7ed321] hover:bg-[#6bc916] text-black font-bold rounded-md transition-colors"
+              title="Add another Supabase project"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Add</span>
+            </button>
             {activeProject?.githubEnabled ? (
               <div className="flex items-center gap-1 px-2 py-1 text-xs bg-[#7ed321]/10 border border-[#7ed321]/30 text-[#7ed321] rounded-md">
                 <Github className="w-3 h-3" />
@@ -173,6 +183,15 @@ export const Header = memo(function Header({
         />
       )}
     </AnimatePresence>
+
+    {/* Connect Project Dialog */}
+    <ConnectProjectDialog
+      open={showConnectDialog}
+      onOpenChange={setShowConnectDialog}
+      onSuccess={() => {
+        onRefresh();
+      }}
+    />
     </>
   );
 });

@@ -1,16 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { motion } from 'motion/react';
 import { useSupabaseClient, authToasts } from '@/lib/auth';
 import { videoUrls } from '@/lib/supabase/storage';
-import { RaccoonWelcome } from '@/app/components/RaccoonWelcome';
+import { 
+  PasswordInput, 
+  PasswordStrength, 
+  OAuthButtons 
+} from '@/app/components/auth';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import {
   Form,
   FormControl,
@@ -21,168 +26,162 @@ import {
   FormDescription,
 } from '@/app/components/ui/form';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
-import { Loader2, Database, Search, BarChart3, Code2, ExternalLink } from 'lucide-react';
+import { Loader2, Database, Search, BarChart3, Code2 } from 'lucide-react';
 
-// Supabase credentials authentication
-const supabaseConnectSchema = z.object({
-  supabaseUrl: z.string().url('Please enter a valid Supabase URL').refine(
-    (url) => url.includes('supabase.co') || url.includes('localhost'),
-    'Must be a valid Supabase URL'
-  ),
-  supabaseKey: z.string().min(20, 'Please enter your Supabase anon or service role key'),
+// Sign In Schema
+const signInSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
 });
 
-type SupabaseConnectFormValues = z.infer<typeof supabaseConnectSchema>;
+// Sign Up Schema
+const signUpSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
+});
 
-const normalizeSupabaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
-
-const capitalize = (value: string) =>
-  value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
-
-const deriveProjectName = (url: string) => {
-  try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname;
-
-    if (hostname === 'localhost') {
-      return 'Local Supabase';
-    }
-
-    const withoutKnownDomain = hostname.endsWith('.supabase.co')
-      ? hostname.slice(0, -'.supabase.co'.length)
-      : hostname;
-
-    const parts = withoutKnownDomain.split(/[-._]/).filter(Boolean);
-
-    if (parts.length === 0) {
-      return 'Supabase Project';
-    }
-
-    return parts.map(capitalize).join(' ');
-  } catch {
-    return 'Supabase Project';
-  }
-};
+type SignInFormValues = z.infer<typeof signInSchema>;
+type SignUpFormValues = z.infer<typeof signUpSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useSupabaseClient();
-  const [connecting, setConnecting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
-  const connectForm = useForm<SupabaseConnectFormValues>({
-    resolver: zodResolver(supabaseConnectSchema),
-    defaultValues: { 
-      supabaseUrl: '', 
-      supabaseKey: '' 
-    },
+  // Get error from URL params (from auth callback)
+  const urlError = searchParams?.get('error');
+
+  const signInForm = useForm<SignInFormValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: '', password: '' },
   });
 
-  const handleConnect = async (values: SupabaseConnectFormValues) => {
-    setConnecting(true);
+  const signUpForm = useForm<SignUpFormValues>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: { email: '', password: '', confirmPassword: '' },
+  });
+
+  const handleSignIn = async (values: SignInFormValues) => {
+    setLoading(true);
     setError(undefined);
 
-    const normalizedUrl = normalizeSupabaseUrl(values.supabaseUrl);
-    const supabaseKey = values.supabaseKey.trim();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
     try {
-      // Verify credentials by making a lightweight API call
-      const testResponse = await fetch(`${normalizedUrl}/rest/v1/`, {
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Accept': 'application/json',
-          'Cache-Control': 'no-store',
-        },
-        signal: controller.signal,
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
       });
 
-      if (!testResponse.ok) {
-        throw new Error('Invalid Supabase credentials. Check your URL and API key.');
-      }
-
-      authToasts.connectionSuccess();
-
-      // Create anonymous session in our app
-      const { data: { user }, error: signInError } = await supabase.auth.signInAnonymously();
-
       if (signInError) {
-        // Check if anonymous sign-in is disabled in SlopCollector's Supabase project
-        if (
-          signInError.message?.toLowerCase().includes('anonymous') ||
-          signInError.message?.toLowerCase().includes('signups not allowed') ||
-          signInError.status === 400
-        ) {
-          throw new Error(
-            'Anonymous sign-ins are disabled in SlopCollector\'s backend. This is a configuration issue with the SlopCollector app itself. Please contact support or check if anonymous authentication is enabled in the SlopCollector Supabase project.'
-          );
-        }
         throw signInError;
       }
 
-      if (!user) throw new Error('Failed to create session');
-
-      const projectName = deriveProjectName(normalizedUrl);
-
-      // Check if this project already exists for the user
-      const connectResponse = await fetch('/api/internal/projects/connect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          supabaseUrl: normalizedUrl,
-          supabaseAnonKey: supabaseKey,
-          projectName,
-        }),
-      });
-
-      if (!connectResponse.ok) {
-        const data = await connectResponse.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Failed to connect project');
+      if (data.user) {
+        authToasts.signInSuccess();
+        router.push('/');
+        router.refresh();
       }
-
-      // Show welcome animation
-      authToasts.signInSuccess();
-      setShowWelcome(true);
     } catch (err) {
-      const errorMessage =
-        err instanceof DOMException && err.name === 'AbortError'
-          ? 'Connection timed out. Check your Supabase URL and key, then try again.'
-          : err instanceof Error
-          ? err.message
-          : 'Failed to connect to Supabase';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to sign in';
       authToasts.authError(errorMessage);
       setError(errorMessage);
     } finally {
-      clearTimeout(timeoutId);
-      setConnecting(false);
+      setLoading(false);
     }
   };
 
-  const handleWelcomeComplete = () => {
-    router.push('/');
-    router.refresh();
+  const handleSignUp = async (values: SignUpFormValues) => {
+    setLoading(true);
+    setError(undefined);
+
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            email: values.email,
+          },
+        },
+      });
+
+      if (signUpError) {
+        throw signUpError;
+      }
+
+      if (data.user) {
+        // Check if email confirmation is required
+        if (data.user.identities && data.user.identities.length === 0) {
+          // User already exists
+          setError('An account with this email already exists. Please sign in instead.');
+          setActiveTab('signin');
+        } else {
+          // Success - show email sent message
+          setEmailSent(true);
+          authToasts.emailSent();
+        }
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to sign up';
+      authToasts.authError(errorMessage);
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (showWelcome) {
-    return <RaccoonWelcome onComplete={handleWelcomeComplete} />;
+  if (emailSent) {
+    return (
+      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full bg-[#2a2a2a] rounded-lg shadow-2xl p-8 border border-[#3a3a3a] text-center"
+        >
+          <div className="w-16 h-16 bg-[#7ed321]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Database className="w-8 h-8 text-[#7ed321]" />
+          </div>
+          <h2 className="text-2xl font-mono font-bold text-white mb-2">
+            Check Your Email
+          </h2>
+          <p className="text-[#999] font-mono text-sm mb-6">
+            We've sent a verification link to <strong className="text-white">{signUpForm.getValues('email')}</strong>
+          </p>
+          <p className="text-[#666] font-mono text-xs mb-6">
+            Click the link in the email to verify your account and sign in.
+          </p>
+          <Button
+            onClick={() => setEmailSent(false)}
+            variant="outline"
+            className="w-full bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono hover:bg-[#2a2a2a] hover:border-[#7ed321]"
+          >
+            Back to Sign In
+          </Button>
+        </motion.div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-[#1a1a1a]">
       <div className="h-screen flex flex-col lg:flex-row">
-        <motion.div 
+        {/* Left Side - Value Proposition */}
+        <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
           className="lg:w-1/2 flex flex-col items-center justify-center p-8 lg:p-12 relative"
         >
           <div className="max-w-lg w-full">
-            <motion.div 
+            <motion.div
               className="mb-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -192,10 +191,10 @@ export default function LoginPage() {
                 SlopCollector
               </h1>
               <p className="text-base text-[#999] font-mono mb-1">
-                Find the slop in your Supabase
+                AI-powered Supabase schema advisor
               </p>
               <p className="text-xs text-[#666] font-mono">
-                No signup. Just paste your project credentials.
+                Sign up to analyze your projects
               </p>
             </motion.div>
             <motion.div
@@ -211,18 +210,14 @@ export default function LoginPage() {
                 playsInline
                 preload="auto"
                 className="w-full h-auto"
-                onError={(e) => {
-                  console.error('Raccoon video failed to load:', e);
-                  console.log('Video path:', videoUrls.racoon());
-                }}
               >
                 <source src={videoUrls.racoon()} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             </motion.div>
 
-            {/* Key Features - Compact */}
-            <motion.div 
+            {/* Key Features */}
+            <motion.div
               className="space-y-3"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -230,183 +225,257 @@ export default function LoginPage() {
             >
               <div className="flex items-center gap-3">
                 <Database className="w-4 h-4 text-[#7ed321]" />
-                <p className="text-sm text-[#ccc] font-mono">Paste URL + API key → instant access</p>
+                <p className="text-sm text-[#ccc] font-mono">Connect multiple Supabase projects</p>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <Search className="w-4 h-4 text-[#ff6b6b]" />
-                <p className="text-sm text-[#ccc] font-mono">Scan all tables for missing indexes</p>
+                <p className="text-sm text-[#ccc] font-mono">Detect missing indexes & bottlenecks</p>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <BarChart3 className="w-4 h-4 text-[#4ecdc4]" />
-                <p className="text-sm text-[#ccc] font-mono">See exact performance impact</p>
+                <p className="text-sm text-[#ccc] font-mono">AI-powered optimization advice</p>
               </div>
 
               <div className="flex items-center gap-3">
                 <Code2 className="w-4 h-4 text-[#f7b731]" />
-                <p className="text-sm text-[#ccc] font-mono">Keyboard shortcuts (⌘K to search)</p>
+                <p className="text-sm text-[#ccc] font-mono">Developer-friendly interface</p>
               </div>
             </motion.div>
           </div>
         </motion.div>
 
         {/* Right Side - Auth Forms */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
           className="lg:w-1/2 flex items-center justify-center p-8 lg:p-12 bg-[#0f0f0f]"
         >
-          <motion.div 
+          <motion.div
             className="w-full max-w-md bg-[#2a2a2a] rounded-lg shadow-2xl p-8 border border-[#3a3a3a]"
             initial={{ scale: 0.95 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-mono font-bold text-white mb-2">
-                Connect Your Supabase
-              </h2>
-              <p className="text-sm text-[#999] font-mono">
-                Enter your project credentials to start
-              </p>
-            </div>
-
-            {error && (
+            {(error || urlError) && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
+                className="mb-4"
               >
-                <Alert variant="destructive" className="mb-4 bg-[#ff6b6b]/10 border-[#ff6b6b]">
-                  <AlertDescription className="text-[#ff6b6b]">{error}</AlertDescription>
+                <Alert variant="destructive" className="bg-[#ff6b6b]/10 border-[#ff6b6b]">
+                  <AlertDescription className="text-[#ff6b6b] font-mono text-sm">
+                    {error || urlError}
+                  </AlertDescription>
                 </Alert>
               </motion.div>
             )}
 
-            <motion.div 
-              className="bg-[#4ecdc4]/10 border border-[#4ecdc4]/30 rounded-lg p-3 mb-4"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <Database className="w-4 h-4 text-[#4ecdc4] mt-0.5 shrink-0" />
-                  <p className="text-xs text-[#4ecdc4] font-mono">
-                    Dashboard → Settings → API
-                  </p>
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'signin' | 'signup')}>
+              <TabsList className="grid w-full grid-cols-2 mb-6 bg-[#1a1a1a]">
+                <TabsTrigger 
+                  value="signin" 
+                  className="font-mono data-[state=active]:bg-[#7ed321] data-[state=active]:text-black"
+                >
+                  Sign In
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="signup" 
+                  className="font-mono data-[state=active]:bg-[#7ed321] data-[state=active]:text-black"
+                >
+                  Sign Up
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Sign In Tab */}
+              <TabsContent value="signin">
+                <Form {...signInForm}>
+                  <form onSubmit={signInForm.handleSubmit(handleSignIn)} className="space-y-4">
+                    <FormField
+                      control={signInForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[#ccc] font-mono text-sm">Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              placeholder="you@example.com"
+                              autoComplete="email"
+                              disabled={loading}
+                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={signInForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[#ccc] font-mono text-sm">Password</FormLabel>
+                          <FormControl>
+                            <PasswordInput
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Enter your password"
+                              disabled={loading}
+                              autoComplete="current-password"
+                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex justify-end">
+                      <a
+                        href="/reset-password"
+                        className="text-xs text-[#4ecdc4] hover:text-[#3dbdb5] font-mono hover:underline"
+                      >
+                        Forgot password?
+                      </a>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Signing in...
+                        </>
+                      ) : (
+                        'Sign In'
+                      )}
+                    </Button>
+                  </form>
+                </Form>
+
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-[#3a3a3a]"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-[#2a2a2a] px-2 text-[#666] font-mono">OR</span>
+                  </div>
                 </div>
-                <div className="text-xs text-[#666] font-mono space-y-1">
-                  <p>• Copy "Project URL"</p>
-                  <p>• Copy "anon public" key</p>
+
+                <OAuthButtons redirectTo="/" />
+              </TabsContent>
+
+              {/* Sign Up Tab */}
+              <TabsContent value="signup">
+                <Form {...signUpForm}>
+                  <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
+                    <FormField
+                      control={signUpForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[#ccc] font-mono text-sm">Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              placeholder="you@example.com"
+                              autoComplete="email"
+                              disabled={loading}
+                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={signUpForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[#ccc] font-mono text-sm">Password</FormLabel>
+                          <FormControl>
+                            <PasswordInput
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Create a strong password"
+                              disabled={loading}
+                              autoComplete="new-password"
+                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                            />
+                          </FormControl>
+                          <PasswordStrength password={field.value} />
+                          <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={signUpForm.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[#ccc] font-mono text-sm">
+                            Confirm Password
+                          </FormLabel>
+                          <FormControl>
+                            <PasswordInput
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Confirm your password"
+                              disabled={loading}
+                              autoComplete="new-password"
+                              className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormDescription className="text-[#666] font-mono text-xs">
+                      By signing up, you agree to analyze your Supabase projects with AI.
+                    </FormDescription>
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Creating account...
+                        </>
+                      ) : (
+                        'Create Account'
+                      )}
+                    </Button>
+                  </form>
+                </Form>
+
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-[#3a3a3a]"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-[#2a2a2a] px-2 text-[#666] font-mono">OR</span>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
 
-            <Form {...connectForm}>
-              <form onSubmit={connectForm.handleSubmit(handleConnect)} className="space-y-4">
-                <FormField
-                  control={connectForm.control}
-                  name="supabaseUrl"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[#ccc] font-mono text-sm">Project URL</FormLabel>
-                      <FormControl>
-                        <motion.div whileFocus={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
-                          <Input
-                            type="url"
-                            placeholder="https://xxx.supabase.co"
-                            autoComplete="url"
-                            disabled={connecting}
-                            className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321]"
-                            {...field}
-                          />
-                        </motion.div>
-                      </FormControl>
-                      <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={connectForm.control}
-                  name="supabaseKey"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center justify-between">
-                        <FormLabel className="text-[#ccc] font-mono text-sm">API Key (anon/public)</FormLabel>
-                        <button
-                          type="button"
-                          onClick={() => field.onChange(field.value ? '' : field.value)}
-                          className="text-xs text-[#4ecdc4] hover:text-[#3dbdb5] font-mono"
-                        >
-                          {field.value.length > 0 && '***'}
-                        </button>
-                      </div>
-                      <FormControl>
-                        <motion.div whileFocus={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
-                          <Input
-                            type="password"
-                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                            autoComplete="off"
-                            disabled={connecting}
-                            className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-[#7ed321] text-xs"
-                            {...field}
-                          />
-                        </motion.div>
-                      </FormControl>
-                      <FormDescription className="text-[#666] font-mono text-xs">
-                        Read-only access. Your key stays local.
-                      </FormDescription>
-                      <FormMessage className="text-[#ff6b6b] font-mono text-xs" />
-                    </FormItem>
-                  )}
-                />
-
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button
-                    type="submit"
-                    className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
-                    disabled={connecting}
-                  >
-                    {connecting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Verifying...
-                      </>
-                    ) : (
-                      <>
-                        <Database className="w-4 h-4 mr-2" />
-                        Connect & Start
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
-              </form>
-            </Form>
-
-            <motion.div 
-              className="mt-6 pt-6 border-t border-[#3a3a3a] space-y-3"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              <a
-                href="https://supabase.com/dashboard/project/_/settings/api"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 text-xs text-[#4ecdc4] hover:text-[#3dbdb5] font-mono hover:underline"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Open Supabase Dashboard
-              </a>
-              <div className="flex items-center justify-center gap-2 text-xs text-[#666] font-mono">
-                <span>Tip:</span>
-                <kbd className="px-2 py-1 text-xs font-mono bg-[#1a1a1a] border border-[#3a3a3a] rounded">
-                  Enter
-                </kbd>
-              </div>
-            </motion.div>
+                <OAuthButtons redirectTo="/" />
+              </TabsContent>
+            </Tabs>
           </motion.div>
         </motion.div>
       </div>

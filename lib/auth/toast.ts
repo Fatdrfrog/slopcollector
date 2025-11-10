@@ -40,5 +40,12 @@ export const authToasts = {
       duration: 4000,
     });
   },
+
+  emailSent: () => {
+    toast.success('Email sent!', {
+      description: 'Check your inbox for a verification link.',
+      duration: 4000,
+    });
+  },
 };
 

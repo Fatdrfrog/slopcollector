@@ -44,11 +44,14 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
+  // Redirect unauthenticated users to login
+  // Except for public routes: /login, /signup, /reset-password, /auth/*
+  const publicRoutes = ['/login', '/signup', '/reset-password'];
+  const isPublicRoute = publicRoutes.some(route => 
+    request.nextUrl.pathname.startsWith(route)
+  ) || request.nextUrl.pathname.startsWith('/auth/');
+  
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);

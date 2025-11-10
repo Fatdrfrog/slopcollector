@@ -26,7 +26,18 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'You must be signed in to connect a project' },
+        { status: 401 }
+      );
+    }
+
+    // Verify user has a confirmed email (not anonymous)
+    if (!user.email) {
+      return NextResponse.json(
+        { error: 'Please sign in with a valid account to connect projects' },
+        { status: 403 }
+      );
     }
 
     const service = getServiceClient();

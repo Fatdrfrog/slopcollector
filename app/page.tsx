@@ -174,36 +174,8 @@ export default function Home() {
     }
   }, [activeProjectId, refresh]);
 
-  // Auto-sync when project changes and no data yet
-  useEffect(() => {
-    if (activeProjectId && remoteTables.length === 0 && !loading) {
-      void handleSync();
-    }
-  }, [activeProjectId, remoteTables.length, loading, handleSync]);
-
-  // Auto-generate AI advice on first sync if no suggestions exist
-  useEffect(() => {
-    // Only run if:
-    // 1. We have tables (schema synced)
-    // 2. We have no suggestions yet
-    // 3. Not currently generating
-    // 4. Not currently loading
-    if (
-      activeProjectId &&
-      remoteTables.length > 0 &&
-      remoteSuggestions.length === 0 &&
-      !isGeneratingAdvice &&
-      !loading
-    ) {
-      console.log('🤖 Auto-generating AI advice for first-time project');
-      // Delay slightly to let UI settle
-      const timer = setTimeout(() => {
-        void handleGenerateAdvice();
-      }, 1500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [activeProjectId, remoteTables.length, remoteSuggestions.length, isGeneratingAdvice, loading, handleGenerateAdvice]);
+  // Note: ConnectProjectDialog handles initial sync + AI advice for new projects
+  // These effects are for manual operations only (user clicks Refresh/Run AI Advice)
 
 
   // Table navigation handlers

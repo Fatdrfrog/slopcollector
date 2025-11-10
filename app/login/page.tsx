@@ -284,13 +284,13 @@ function LoginPageContent() {
               <TabsList className="grid w-full grid-cols-2 mb-6 bg-[#1a1a1a]">
                 <TabsTrigger 
                   value="signin" 
-                  className="font-mono data-[state=active]:bg-[#7ed321] data-[state=active]:text-black"
+                  className="font-mono data-[state=active]:bg-[#7ed321] data-[state=active]:text-black text-white"
                 >
                   Sign In
                 </TabsTrigger>
                 <TabsTrigger 
                   value="signup" 
-                  className="font-mono data-[state=active]:bg-[#7ed321] data-[state=active]:text-black"
+                  className="font-mono data-[state=active]:bg-[#7ed321] data-[state=active]:text-black text-white"
                 >
                   Sign Up
                 </TabsTrigger>
@@ -459,7 +459,7 @@ function LoginPageContent() {
                     <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
                       <Button
                         type="submit"
-                        className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold transition-all shadow-lg hover:shadow-xl hover:shadow-[#7ed321]/20"
+                        className="w-full bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold transition-all shadow-lg hover:shadow-xl"
                         disabled={loading}
                       >
                         {loading ? (

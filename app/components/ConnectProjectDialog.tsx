@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -44,6 +44,14 @@ interface ConnectProjectDialogProps {
   onSuccess?: () => void;
 }
 
+type FlowStatus = 
+  | 'input'           // User entering credentials
+  | 'connecting'      // Verifying credentials
+  | 'syncing'         // Fetching schema from Supabase
+  | 'analyzing'       // Running AI advice
+  | 'complete'        // All done, showing success
+  | 'error';          // Something went wrong
+
 const normalizeSupabaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
 
 const deriveProjectName = (url: string) => {
@@ -81,8 +89,14 @@ export function ConnectProjectDialog({
   onSuccess,
 }: ConnectProjectDialogProps) {
   const router = useRouter();
-  const [connecting, setConnecting] = useState(false);
+  const [status, setStatus] = useState<FlowStatus>('input');
   const [error, setError] = useState<string>();
+  const [projectId, setProjectId] = useState<string>();
+  const [projectName, setProjectName] = useState<string>();
+  const [progress, setProgress] = useState({
+    tablesFound: 0,
+    suggestionsGenerated: 0,
+  });
 
   const form = useForm<ConnectProjectFormValues>({
     resolver: zodResolver(connectProjectSchema),
@@ -92,17 +106,32 @@ export function ConnectProjectDialog({
     },
   });
 
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setTimeout(() => {
+        setStatus('input');
+        setError(undefined);
+        setProjectId(undefined);
+        setProjectName(undefined);
+        setProgress({ tablesFound: 0, suggestionsGenerated: 0 });
+        form.reset();
+      }, 300); // After dialog animation
+    }
+  }, [open, form]);
+
   const handleConnect = async (values: ConnectProjectFormValues) => {
-    setConnecting(true);
+    setStatus('connecting');
     setError(undefined);
 
     const normalizedUrl = normalizeSupabaseUrl(values.supabaseUrl);
     const supabaseKey = values.supabaseKey.trim();
+    const derivedProjectName = deriveProjectName(normalizedUrl);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      // Verify credentials by making a lightweight API call
+      // Step 1: Verify credentials
       const testResponse = await fetch(`${normalizedUrl}/rest/v1/`, {
         headers: {
           apikey: supabaseKey,
@@ -117,18 +146,14 @@ export function ConnectProjectDialog({
         throw new Error('Invalid Supabase credentials. Check your URL and API key.');
       }
 
-      const projectName = deriveProjectName(normalizedUrl);
-
-      // Connect the project
+      // Step 2: Connect project to database
       const connectResponse = await fetch('/api/internal/projects/connect', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           supabaseUrl: normalizedUrl,
           supabaseAnonKey: supabaseKey,
-          projectName,
+          projectName: derivedProjectName,
         }),
       });
 
@@ -137,16 +162,31 @@ export function ConnectProjectDialog({
         throw new Error(data.error ?? 'Failed to connect project');
       }
 
+      const { projectId: newProjectId } = await connectResponse.json();
+      setProjectId(newProjectId);
+      setProjectName(derivedProjectName);
+
+      clearTimeout(timeoutId);
+
+      // Step 3: Sync schema from Supabase
+      await syncSchema(newProjectId);
+
+      // Step 4: Generate AI advice
+      await generateAdvice(newProjectId);
+
+      // Step 5: Success!
+      setStatus('complete');
       authToasts.connectionSuccess();
-      form.reset();
-      onOpenChange(false);
       
-      // Notify parent and refresh
-      if (onSuccess) {
-        onSuccess();
-      }
-      
-      router.refresh();
+      // Wait 2 seconds to show success, then close and refresh
+      setTimeout(() => {
+        form.reset();
+        onOpenChange(false);
+        if (onSuccess) {
+          onSuccess();
+        }
+        router.refresh();
+      }, 2000);
     } catch (err) {
       const errorMessage =
         err instanceof DOMException && err.name === 'AbortError'
@@ -156,15 +196,68 @@ export function ConnectProjectDialog({
           : 'Failed to connect to Supabase';
       authToasts.authError(errorMessage);
       setError(errorMessage);
+      setStatus('error');
     } finally {
       clearTimeout(timeoutId);
-      setConnecting(false);
     }
   };
 
+  const syncSchema = async (projectId: string) => {
+    setStatus('syncing');
+    
+    const response = await fetch('/api/internal/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error ?? 'Failed to sync schema');
+    }
+
+    const result = await response.json();
+    setProgress((prev) => ({ ...prev, tablesFound: result.tablesCount || 0 }));
+  };
+
+  const generateAdvice = async (projectId: string) => {
+    setStatus('analyzing');
+
+    const response = await fetch('/api/internal/advice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error ?? 'Failed to generate advice');
+    }
+
+    const result = await response.json();
+    setProgress((prev) => ({
+      ...prev,
+      suggestionsGenerated: result.result?.newSuggestions || 0,
+    }));
+  };
+
+  // Prevent closing during loading states
+  const handleOpenChange = (newOpen: boolean) => {
+    // Only allow closing when in input, complete, or error state
+    if (!newOpen && (status === 'connecting' || status === 'syncing' || status === 'analyzing')) {
+      return; // Prevent closing during processing
+    }
+    onOpenChange(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#2a2a2a] border-[#3a3a3a] text-white max-w-md">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="bg-[#2a2a2a] border-[#3a3a3a] text-white max-w-md" onEscapeKeyDown={(e) => {
+        // Prevent ESC key closing during processing
+        if (status === 'connecting' || status === 'syncing' || status === 'analyzing') {
+          e.preventDefault();
+        }
+      }}>
         <DialogHeader>
           <DialogTitle className="text-2xl font-mono font-bold text-white">
             Connect Supabase Project
@@ -174,33 +267,26 @@ export function ConnectProjectDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {error && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-            <Alert variant="destructive" className="bg-[#ff6b6b]/10 border-[#ff6b6b]">
-              <AlertDescription className="text-[#ff6b6b] font-mono text-sm">
-                {error}
-              </AlertDescription>
-            </Alert>
-          </motion.div>
-        )}
-
-        <div className="bg-[#4ecdc4]/10 border border-[#4ecdc4]/30 rounded-lg p-3 mb-2">
-          <div className="space-y-2">
-            <div className="flex items-start gap-2">
-              <Database className="w-4 h-4 text-[#4ecdc4] mt-0.5 shrink-0" />
-              <p className="text-xs text-[#4ecdc4] font-mono">
-                Dashboard → Settings → API
-              </p>
+        {/* Input State - Enter credentials */}
+        {status === 'input' && (
+          <>
+            <div className="bg-[#4ecdc4]/10 border border-[#4ecdc4]/30 rounded-lg p-3 mb-2">
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <Database className="w-4 h-4 text-[#4ecdc4] mt-0.5 shrink-0" />
+                  <p className="text-xs text-[#4ecdc4] font-mono">
+                    Dashboard → Settings → API
+                  </p>
+                </div>
+                <div className="text-xs text-[#666] font-mono space-y-1">
+                  <p>• Copy "Project URL"</p>
+                  <p>• Copy "anon public" key</p>
+                </div>
+              </div>
             </div>
-            <div className="text-xs text-[#666] font-mono space-y-1">
-              <p>• Copy "Project URL"</p>
-              <p>• Copy "anon public" key</p>
-            </div>
-          </div>
-        </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleConnect)} className="space-y-4">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleConnect)} className="space-y-4">
             <FormField
               control={form.control}
               name="supabaseUrl"
@@ -212,7 +298,7 @@ export function ConnectProjectDialog({
                       type="url"
                       placeholder="https://xxx.supabase.co"
                       autoComplete="url"
-                      disabled={connecting}
+                      disabled={status !== 'input'}
                       autoFocus
                       className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-2 focus:ring-[#7ed321]/20 transition-all"
                       {...field}
@@ -236,7 +322,7 @@ export function ConnectProjectDialog({
                       type="password"
                       placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                       autoComplete="off"
-                      disabled={connecting}
+                      disabled={status !== 'input'}
                       className="bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono placeholder:text-[#666] focus:border-[#7ed321] focus:ring-2 focus:ring-[#7ed321]/20 transition-all text-xs"
                       {...field}
                     />
@@ -254,7 +340,7 @@ export function ConnectProjectDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={connecting}
+                disabled={status !== 'input'}
                 className="flex-1 bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono hover:bg-[#2a2a2a]"
               >
                 Cancel
@@ -262,19 +348,10 @@ export function ConnectProjectDialog({
               <Button
                 type="submit"
                 className="flex-1 bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
-                disabled={connecting}
+                disabled={status !== 'input'}
               >
-                {connecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    <Database className="w-4 h-4 mr-2" />
-                    Connect
-                  </>
-                )}
+                <Database className="w-4 h-4 mr-2" />
+                Connect & Analyze
               </Button>
             </div>
           </form>
@@ -291,6 +368,156 @@ export function ConnectProjectDialog({
             Open Supabase Dashboard
           </a>
         </div>
+          </>
+        )}
+
+        {/* Connecting State */}
+        {status === 'connecting' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="py-8"
+          >
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-[#7ed321]/10 rounded-full flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-[#7ed321] animate-spin" />
+              </div>
+              <div>
+                <h3 className="text-lg font-mono font-bold text-white mb-1">
+                  Verifying Credentials
+                </h3>
+                <p className="text-sm text-[#999] font-mono">
+                  Testing connection to your Supabase project...
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Syncing State */}
+        {status === 'syncing' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="py-8"
+          >
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-[#4ecdc4]/10 rounded-full flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-[#4ecdc4] animate-spin" />
+              </div>
+              <div>
+                <h3 className="text-lg font-mono font-bold text-white mb-1">
+                  Syncing Schema
+                </h3>
+                <p className="text-sm text-[#999] font-mono">
+                  Fetching tables, columns, and relationships...
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Analyzing State */}
+        {status === 'analyzing' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="py-8"
+          >
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-[#f7b731]/10 rounded-full flex items-center justify-center relative">
+                <Loader2 className="w-8 h-8 text-[#f7b731] animate-spin" />
+                <div className="absolute inset-0 rounded-full bg-[#f7b731]/10 animate-ping"></div>
+              </div>
+              <div>
+                <h3 className="text-lg font-mono font-bold text-white mb-1">
+                  Running AI Analysis
+                </h3>
+                <p className="text-sm text-[#999] font-mono mb-2">
+                  GPT analyzing your schema for optimization opportunities...
+                </p>
+                {progress.tablesFound > 0 && (
+                  <p className="text-xs text-[#666] font-mono">
+                    Found {progress.tablesFound} tables to analyze
+                  </p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Complete State */}
+        {status === 'complete' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="py-8"
+          >
+            <div className="flex flex-col items-center text-center space-y-4">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                className="w-16 h-16 bg-[#7ed321]/20 rounded-full flex items-center justify-center"
+              >
+                <Database className="w-8 h-8 text-[#7ed321]" />
+              </motion.div>
+              <div>
+                <h3 className="text-lg font-mono font-bold text-[#7ed321] mb-1">
+                  Project Connected! 🎉
+                </h3>
+                <p className="text-sm text-[#999] font-mono mb-3">
+                  {projectName}
+                </p>
+                <div className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg p-3 space-y-2 text-left">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-[#666]">Tables synced:</span>
+                    <span className="text-white font-bold">{progress.tablesFound}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-[#666]">AI suggestions:</span>
+                    <span className="text-[#7ed321] font-bold">{progress.suggestionsGenerated}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-[#666] font-mono mt-3">
+                  Redirecting to dashboard...
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Error State */}
+        {status === 'error' && error && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <Alert variant="destructive" className="bg-[#ff6b6b]/10 border-[#ff6b6b] mb-4">
+              <AlertDescription className="text-[#ff6b6b] font-mono text-sm">
+                {error}
+              </AlertDescription>
+            </Alert>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => {
+                  setStatus('input');
+                  setError(undefined);
+                }}
+                className="flex-1 bg-[#7ed321] hover:bg-[#6bc916] text-black font-mono font-bold"
+              >
+                Try Again
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="flex-1 bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono hover:bg-[#2a2a2a]"
+              >
+                Cancel
+              </Button>
+            </div>
+          </motion.div>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -49,7 +49,7 @@ export function OAuthButtons({ redirectTo = '/' }: OAuthButtonsProps) {
         <Button
           type="button"
           variant="outline"
-          className="w-full bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono hover:bg-[#2a2a2a] hover:border-[#7ed321]"
+          className="w-full bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono hover:bg-[#2a2a2a] hover:border-[#7ed321] hover:text-white"
           onClick={() => handleOAuth('google')}
           disabled={loadingProvider !== null}
         >
@@ -83,7 +83,7 @@ export function OAuthButtons({ redirectTo = '/' }: OAuthButtonsProps) {
         <Button
           type="button"
           variant="outline"
-          className="w-full bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono hover:bg-[#2a2a2a] hover:border-[#7ed321]"
+          className="w-full bg-[#1a1a1a] border-[#3a3a3a] text-white font-mono hover:bg-[#2a2a2a] hover:border-[#7ed321] hover:text-white"
           onClick={() => handleOAuth('github')}
           disabled={loadingProvider !== null}
         >

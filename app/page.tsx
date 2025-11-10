@@ -208,6 +208,19 @@ export default function Home() {
 
   const selectedTableData = tables.find(t => t.id === selectedTable);
 
+  // Handle OAuth callback codes that land on homepage (redirect to proper callback)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    
+    if (code) {
+      // OAuth code landed on homepage - redirect to proper callback
+      const next = urlParams.get('next') || '/';
+      window.location.href = `/auth/callback?code=${code}&next=${encodeURIComponent(next)}`;
+      return;
+    }
+  }, []);
+
   // Redirect to login if not connected
   useEffect(() => {
     if (!authLoading && !user && !isConnected) {

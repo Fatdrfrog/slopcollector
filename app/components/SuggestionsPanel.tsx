@@ -45,9 +45,9 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
   );
 
   return (
-    <div className="w-[420px] h-full border-l border-gray-800 bg-linear-to-b from-[#1a1a1a] to-[#151515] flex flex-col overflow-hidden">
+    <div className="h-full border-l border-gray-800 bg-linear-to-b from-[#1a1a1a] to-[#151515] flex flex-col overflow-hidden w-full min-w-[320px]">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-gray-800 bg-[#0f0f0f]/60 backdrop-blur-sm flex-shrink-0">
+      <div className="px-5 py-4 border-b border-gray-800 bg-[#0f0f0f]/60 backdrop-blur-sm shrink-0">
         <h2 className="text-gray-100 flex items-center gap-2.5">
           <div className="p-1.5 bg-indigo-950/30 rounded-lg">
             <TrendingUp className="w-4 h-4 text-indigo-400" />
@@ -89,7 +89,7 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
 
       {/* Summary Stats */}
       {filteredSuggestions.length > 0 && (
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <SummaryStats groupedSuggestions={groupedSuggestions} />
         </div>
       )}

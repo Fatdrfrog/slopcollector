@@ -180,54 +180,51 @@ export function useDashboardData(projectId?: string): DashboardData {
 
       const snapshot = await fetchLatestSnapshot();
 
-      if (!snapshot || !snapshot.tables_data) {
-        setTables([]);
-        setSuggestions([]);
-        setLoading(false);
-        return;
-      }
-
-      // Debug: Log what we actually got from database
-      console.log('📊 Schema Snapshot Data:', {
-        tables_count: Array.isArray(snapshot.tables_data) ? snapshot.tables_data.length : 0,
-        columns_count: Array.isArray(snapshot.columns_data) ? snapshot.columns_data.length : 0,
-        indexes_count: Array.isArray(snapshot.indexes_data) ? snapshot.indexes_data.length : 0,
-        has_columns_data: !!snapshot.columns_data,
-        snapshot_id: snapshot.id,
-        created_at: snapshot.created_at,
-      });
-
-      // Build schema from stored data - ensure we pass columns!
-      const schema: DatabaseSchemaSnapshot = {
-        tables: (snapshot.tables_data as TableSchema[]) || [],
-        columns: (snapshot.columns_data as any[]) || [], 
-        indexes: (snapshot.indexes_data as IndexSchema[]) || [],
-      };
-
-      // Debug: Log the schema we're mapping
-      console.log('🗂️ Mapping schema to tables:', {
-        tables: schema.tables.length,
-        columns: schema.columns.length,
-        indexes: schema.indexes.length,
-      });
-
-      const mappedTables = mapSnapshotToTables(schema);
-      console.log('✅ Mapped tables:', {
-        count: mappedTables.length,
-        sample: mappedTables[0] ? {
-          name: mappedTables[0].name,
-          columnCount: mappedTables[0].columns.length,
-          hasColumns: mappedTables[0].columns.length > 0,
-        } : null,
-      });
-
-      setTables(mappedTables);
-
       // Fetch suggestions and code patterns for this project
       const [suggestionItems, codePatterns] = await Promise.all([
         fetchSuggestions(projectId),
         fetchCodePatterns(projectId),
       ]);
+
+      if (!snapshot || !snapshot.tables_data) {
+        setTables([]);
+      } else {
+        // Debug: Log what we actually got from database
+        console.log('📊 Schema Snapshot Data:', {
+          tables_count: Array.isArray(snapshot.tables_data) ? snapshot.tables_data.length : 0,
+          columns_count: Array.isArray(snapshot.columns_data) ? snapshot.columns_data.length : 0,
+          indexes_count: Array.isArray(snapshot.indexes_data) ? snapshot.indexes_data.length : 0,
+          has_columns_data: !!snapshot.columns_data,
+          snapshot_id: snapshot.id,
+          created_at: snapshot.created_at,
+        });
+
+        // Build schema from stored data - ensure we pass columns!
+        const schema: DatabaseSchemaSnapshot = {
+          tables: (snapshot.tables_data as TableSchema[]) || [],
+          columns: (snapshot.columns_data as any[]) || [], 
+          indexes: (snapshot.indexes_data as IndexSchema[]) || [],
+        };
+
+        // Debug: Log the schema we're mapping
+        console.log('🗂️ Mapping schema to tables:', {
+          tables: schema.tables.length,
+          columns: schema.columns.length,
+          indexes: schema.indexes.length,
+        });
+
+        const mappedTables = mapSnapshotToTables(schema);
+        console.log('✅ Mapped tables:', {
+          count: mappedTables.length,
+          sample: mappedTables[0] ? {
+            name: mappedTables[0].name,
+            columnCount: mappedTables[0].columns.length,
+            hasColumns: mappedTables[0].columns.length > 0,
+          } : null,
+        });
+
+        setTables(mappedTables);
+      }
 
       // Group code patterns by table and column
       const patternsByTableColumn = codePatterns.reduce<Record<string, CodeReference[]>>(

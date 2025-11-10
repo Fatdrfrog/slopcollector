@@ -127,25 +127,23 @@ export default function LoginPage() {
 
       const projectName = deriveProjectName(normalizedUrl);
 
-      const { error: deactivateError } = await supabase
-        .from('connected_projects')
-        .update({ is_active: false })
-        .eq('user_id', user.id);
+      // Check if this project already exists for the user
+      const connectResponse = await fetch('/api/internal/projects/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          supabaseUrl: normalizedUrl,
+          supabaseAnonKey: supabaseKey,
+          projectName,
+        }),
+      });
 
-      if (deactivateError) throw deactivateError;
-
-      // Store Supabase credentials in user profile
-      const { error: profileError } = await supabase
-        .from('connected_projects')
-        .insert({
-          user_id: user.id,
-          project_name: projectName,
-          supabase_url: normalizedUrl,
-          supabase_anon_key: supabaseKey,
-          is_active: true,
-        });
-
-      if (profileError) throw profileError;
+      if (!connectResponse.ok) {
+        const data = await connectResponse.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Failed to connect project');
+      }
 
       // Show welcome animation
       authToasts.signInSuccess();

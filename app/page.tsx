@@ -223,6 +223,12 @@ export default function Home() {
 
   // Redirect to login if not connected
   useEffect(() => {
+    // Ignore if we are handling an OAuth callback (code param present)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('code')) return;
+    }
+
     if (!authLoading && !user && !isConnected) {
       router.push('/login');
     }

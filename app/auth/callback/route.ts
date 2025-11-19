@@ -83,10 +83,11 @@ export async function GET(request: NextRequest) {
 
       // Successful authentication - redirect to next path
       const forwardedHost = request.headers.get('x-forwarded-host');
-      const isLocalEnv = process.env.NODE_ENV === 'development';
+      const forwardedProto = request.headers.get('x-forwarded-proto');
 
-      if (forwardedHost && !isLocalEnv) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
+      if (forwardedHost) {
+        const protocol = forwardedProto || 'https';
+        return NextResponse.redirect(`${protocol}://${forwardedHost}${next}`);
       } else {
         return NextResponse.redirect(new URL(next, requestUrl.origin));
       }

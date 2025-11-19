@@ -208,22 +208,30 @@ export default function Home() {
 
   const selectedTableData = tables.find(t => t.id === selectedTable);
 
+  const [isProcessingCallback, setIsProcessingCallback] = useState(false);
+
   // Handle OAuth callback codes that land on homepage (redirect to proper callback)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     
     if (code) {
       // OAuth code landed on homepage - redirect to proper callback
+      setIsProcessingCallback(true);
       const next = urlParams.get('next') || '/';
-      window.location.href = `/auth/callback?code=${code}&next=${encodeURIComponent(next)}`;
+      
+      // Use replace to avoid adding to history stack
+      window.location.replace(`/auth/callback?code=${code}&next=${encodeURIComponent(next)}`);
       return;
     }
   }, []);
 
   // Redirect to login if not connected
   useEffect(() => {
-    // Ignore if we are handling an OAuth callback (code param present)
+    // Ignore if we are handling an OAuth callback
+    if (isProcessingCallback) return;
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('code')) return;
@@ -232,15 +240,17 @@ export default function Home() {
     if (!authLoading && !user && !isConnected) {
       router.push('/login');
     }
-  }, [authLoading, user, isConnected, router]);
+  }, [authLoading, user, isConnected, router, isProcessingCallback]);
 
-    // Show loading state while checking auth
-    if (authLoading || (!user && !isConnected)) {
+    // Show loading state while checking auth or processing callback
+    if (authLoading || isProcessingCallback || (!user && !isConnected)) {
       return (
         <div className="h-screen w-screen flex items-center justify-center bg-[#0f0f0f]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-gray-400">Loading...</p>
+            <p className="text-gray-400">
+              {isProcessingCallback ? 'Finalizing login...' : 'Loading...'}
+            </p>
           </div>
         </div>
       );

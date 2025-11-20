@@ -213,7 +213,7 @@ export default function Home() {
   // Handle OAuth callback codes that land on homepage (redirect to proper callback)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+    console.log("test")
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     

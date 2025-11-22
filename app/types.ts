@@ -42,4 +42,8 @@ export interface Suggestion {
   description: string;
   impact?: string;
   codeReferences?: CodeReference[];
+  // Status tracking
+  status?: 'pending' | 'applied' | 'dismissed' | null;
+  appliedAt?: string | null;
+  dismissedAt?: string | null;
 }

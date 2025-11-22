@@ -9,6 +9,7 @@ interface SuggestionsPanelProps {
   selectedTable?: Table;
   onSelectTable?: (tableId: string) => void;
   isLoading?: boolean;
+  onStatusChange?: (suggestionId: string, newStatus: 'pending' | 'applied' | 'dismissed') => void;
 }
 
 /**
@@ -20,6 +21,7 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
   selectedTable, 
   onSelectTable,
   isLoading = false,
+  onStatusChange,
 }: SuggestionsPanelProps) {
   // Memoize filtered suggestions to prevent recalculation on every render
   const filteredSuggestions = useMemo(
@@ -81,6 +83,7 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
                 severity={severity}
                 suggestions={groupedSuggestions[severity]}
                 onSelectTable={onSelectTable}
+                onStatusChange={onStatusChange}
               />
             ))}
           </div>
@@ -122,9 +125,10 @@ interface SuggestionGroupProps {
   severity: Suggestion['severity'];
   suggestions: Suggestion[];
   onSelectTable?: (tableId: string) => void;
+  onStatusChange?: (suggestionId: string, newStatus: 'pending' | 'applied' | 'dismissed') => void;
 }
 
-function SuggestionGroup({ severity, suggestions, onSelectTable }: SuggestionGroupProps) {
+function SuggestionGroup({ severity, suggestions, onSelectTable, onStatusChange }: SuggestionGroupProps) {
   const dotColor = severity === 'error' 
     ? 'bg-red-500' 
     : severity === 'warning' 
@@ -143,6 +147,7 @@ function SuggestionGroup({ severity, suggestions, onSelectTable }: SuggestionGro
             key={suggestion.id} 
             suggestion={suggestion}
             onSelectTable={onSelectTable}
+            onStatusChange={onStatusChange}
           />
         ))}
       </div>

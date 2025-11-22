@@ -341,7 +341,7 @@ export default function Home() {
         </div>
       )}
 
-      <ResizablePanelGroup direction="horizontal" className="flex-1 flex overflow-hidden">
+      <ResizablePanelGroup direction="horizontal" className="flex-1 flex">
         {tables.length === 0 ? (
           <EmptyState onSync={handleSync} isSyncing={loading} />
         ) : (

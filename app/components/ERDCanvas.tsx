@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -13,15 +13,12 @@ import {
   type Edge,
   type Connection,
 } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
 import { TableNode, type TableNodeData } from './TableNode';
 import { KeyboardHints } from './KeyboardHints';
 import { RelayoutButton } from './RelayoutButton';
-import { generateNodesFromTables } from '../utils/nodeGenerator';
-import { generateEdgesFromTables } from '../utils/edgeGenerator';
-import { getLayoutedElements } from '../utils/layoutGraph';
-import { hasTableIssues } from '../utils/tableAnalysis';
 import type { Table, Suggestion } from '../types';
+import { useGraphLayout } from '../hooks/useGraphLayout';
+import { GRAPH_CONFIG } from '../utils/graphConfig';
 
 interface ERDCanvasProps {
   tables: Table[];
@@ -33,52 +30,24 @@ interface ERDCanvasProps {
 function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = [] }: ERDCanvasProps) {
   const { fitView, getNode } = useReactFlow();
   
-  // Memoize onTableSelect to prevent unnecessary re-renders
-  const memoizedOnTableSelect = useCallback(onTableSelect, [onTableSelect]);
+  // Use custom hook for all layout logic - eliminates 80+ lines of duplicate code
+  const { nodes: layoutNodes, edges: layoutEdges, relayout } = useGraphLayout(tables, suggestions);
+  
+  // React Flow state management
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(layoutNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutEdges);
 
-  // Only regenerate layout when tables structure changes (not when selection changes)
-  const { initialNodes, initialEdges } = useMemo(() => {
-    const nodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect, suggestions);
-    const baseEdges = generateEdgesFromTables(tables);
-
-    console.log(`🔗 Generating layout with ${baseEdges.length} edges`);
-
-    const layouted = getLayoutedElements(nodes, baseEdges, 'TB');
-    const orientedEdges = generateEdgesFromTables(tables, layouted.nodePositions);
-
-    return {
-      initialNodes: layouted.nodes,
-      initialEdges: orientedEdges,
-    };
-  }, [tables, memoizedOnTableSelect, suggestions]);
-
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
-  // Only regenerate layout when tables array actually changes
+  // Update nodes/edges when layout changes (tables/suggestions change)
   useEffect(() => {
-    const newNodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect, suggestions);
-    const baseEdges = generateEdgesFromTables(tables);
-
-    console.log(`🔄 Layout update: ${baseEdges.length} edges`);
-
-    const layouted = getLayoutedElements(newNodes, baseEdges, 'TB');
-    const orientedEdges = generateEdgesFromTables(tables, layouted.nodePositions);
-
-    // Batch updates using requestAnimationFrame to ensure DOM is updated
-    requestAnimationFrame(() => {
-      setNodes(layouted.nodes);
-      setEdges(orientedEdges);
-    });
-  }, [tables, memoizedOnTableSelect, suggestions, setNodes, setEdges]);
+    setNodes(layoutNodes);
+    setEdges(layoutEdges);
+  }, [layoutNodes, layoutEdges, setNodes, setEdges]);
 
   // Fast update: Only update selection state without recalculating layout
   useEffect(() => {
     setNodes((nds) =>
       nds.map((node) => {
-        if (!node.data) {
-          return node;
-        }
+        if (!node.data) return node;
 
         const isSelected = selectedTable === node.id;
         
@@ -92,6 +61,7 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
           data: {
             ...node.data,
             isSelected,
+            onSelect: onTableSelect, // Update callback
           },
         };
       })
@@ -104,14 +74,15 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
         // Center and zoom to the selected table
         fitView({
           nodes: [node],
-          duration: 400,
-          padding: 0.5,
-          maxZoom: 1,
+          duration: GRAPH_CONFIG.animation.fitViewDuration,
+          padding: GRAPH_CONFIG.animation.selectionPadding,
+          maxZoom: GRAPH_CONFIG.animation.maxZoom,
         });
       }
     }
-  }, [selectedTable, setNodes, getNode, fitView]);
+  }, [selectedTable, onTableSelect, setNodes, getNode, fitView]);
 
+  // Memoize node types to prevent recreation
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       tableNode: TableNode,
@@ -119,6 +90,7 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
     []
   );
 
+  // Handle pane click to deselect
   const handlePaneClick = useCallback(() => {
     onTableSelect(null);
   }, [onTableSelect]);
@@ -148,39 +120,32 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
     return hasValidSourceHandle && hasValidTargetHandle;
   }, [getNode]);
 
+  // Handle manual relayout with fit view
   const handleRelayout = useCallback(() => {
-    const newNodes = generateNodesFromTables(tables, selectedTable, memoizedOnTableSelect, suggestions);
-    const baseEdges = generateEdgesFromTables(tables);
+    relayout();
+    
+    // Fit view after layout is complete
+    setTimeout(() => {
+      fitView({ 
+        padding: GRAPH_CONFIG.animation.fitViewPadding, 
+        duration: GRAPH_CONFIG.animation.fitViewDuration 
+      });
+    }, GRAPH_CONFIG.animation.layoutTransitionDelay);
+  }, [relayout, fitView]);
 
-    console.log(`♻️ Manual relayout: ${baseEdges.length} edges`);
-
-    const layouted = getLayoutedElements(newNodes, baseEdges, 'TB');
-    const orientedEdges = generateEdgesFromTables(tables, layouted.nodePositions);
-
-    // Batch updates using requestAnimationFrame
-    requestAnimationFrame(() => {
-      setNodes(layouted.nodes);
-      setEdges(orientedEdges);
-      
-      // Fit view after layout is complete
-      setTimeout(() => {
-        fitView({ padding: 0.2, duration: 400 });
-      }, 50);
-    });
-  }, [tables, selectedTable, memoizedOnTableSelect, suggestions, setNodes, setEdges, fitView]);
-
+  // Minimap node coloring based on state
   const getMiniMapNodeColor = useCallback((node: Node<TableNodeData>) => {
     if (!node.data) {
-      return '#3a3a3a';
+      return GRAPH_CONFIG.colors.default;
     }
 
     const { isSelected, hasAIIssues, hasSchemaIssues } = node.data;
 
-    if (isSelected) return '#7ed321';           // Green for selected
-    if (hasAIIssues) return '#ff6b6b';          // Red for AI issues
-    if (hasSchemaIssues) return '#f7b731';      // Orange for schema issues
+    if (isSelected) return GRAPH_CONFIG.colors.selected;
+    if (hasAIIssues) return GRAPH_CONFIG.colors.aiIssue;
+    if (hasSchemaIssues) return GRAPH_CONFIG.colors.schemaIssue;
 
-    return '#3a3a3a';  // Gray default
+    return GRAPH_CONFIG.colors.default;
   }, []);
 
   return (
@@ -194,7 +159,10 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
         onPaneClick={handlePaneClick}
         isValidConnection={isValidConnection}
         fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+        fitViewOptions={{ 
+          padding: GRAPH_CONFIG.animation.fitViewPadding, 
+          maxZoom: GRAPH_CONFIG.animation.maxZoom 
+        }}
         minZoom={0.1}
         maxZoom={2}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}

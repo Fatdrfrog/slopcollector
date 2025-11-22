@@ -8,6 +8,7 @@ import { TableNodeHeader } from './TableNodeHeader';
 import { ColumnRow } from './ColumnRow';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+import { GRAPH_CONFIG } from '../utils/graphConfig';
 
 export interface TableNodeData extends Record<string, unknown> {
   table: Table;
@@ -22,9 +23,24 @@ type TableNodeRFNode = Node<TableNodeData>;
 type TableNodeProps = NodeProps<TableNodeRFNode>;
 
 /**
- * Custom React Flow node representing a database table
+ * Custom comparison function for TableNode memo
+ * Only re-render when data that affects visual output changes
  */
-export const TableNode = memo(({ data }: TableNodeProps) => {
+function arePropsEqual(prev: TableNodeProps, next: TableNodeProps): boolean {
+  return (
+    prev.data.isSelected === next.data.isSelected &&
+    prev.data.table.id === next.data.table.id &&
+    prev.data.hasAIIssues === next.data.hasAIIssues &&
+    prev.data.hasSchemaIssues === next.data.hasSchemaIssues &&
+    prev.data.table.columns.length === next.data.table.columns.length
+  );
+}
+
+/**
+ * Custom React Flow node representing a database table
+ * Memoized to prevent unnecessary re-renders on parent updates
+ */
+const TableNodeComponent = ({ data }: TableNodeProps) => {
   const { table, isSelected, onSelect, hasAIIssues, hasSchemaIssues } = data;
   const criticalIssues = countCriticalIssues(table);
 
@@ -84,11 +100,11 @@ export const TableNode = memo(({ data }: TableNodeProps) => {
       <div
         className={`relative bg-gradient-to-br from-[#1a1a1a] to-[#151515] rounded-xl shadow-2xl transition-all duration-200 ${
           isSelected 
-            ? 'ring-2 ring-[#7ed321] shadow-[#7ed321]/30' 
+            ? `ring-2 ring-[${GRAPH_CONFIG.colors.selected}] shadow-[${GRAPH_CONFIG.colors.selected}]/30` 
             : hasAIIssues 
-              ? 'ring-2 ring-[#ff6b6b]/80 shadow-[#ff6b6b]/20' 
+              ? `ring-2 ring-[${GRAPH_CONFIG.colors.aiIssue}]/80 shadow-[${GRAPH_CONFIG.colors.aiIssue}]/20` 
               : hasSchemaIssues
-                ? 'ring-2 ring-[#f7b731]/60 shadow-[#f7b731]/10'
+                ? `ring-2 ring-[${GRAPH_CONFIG.colors.schemaIssue}]/60 shadow-[${GRAPH_CONFIG.colors.schemaIssue}]/10`
                 : 'ring-1 ring-[#3a3a3a]'
         }`}
         style={{ minWidth: '320px' }}
@@ -97,11 +113,11 @@ export const TableNode = memo(({ data }: TableNodeProps) => {
       {/* Gradient border effect for selected/issue states */}
       <div className={`absolute inset-0 rounded-xl bg-gradient-to-br opacity-0 transition-opacity duration-200 ${
         isSelected 
-          ? 'from-[#7ed321] via-[#6bc916] to-[#7ed321] opacity-20' 
+          ? `from-[${GRAPH_CONFIG.colors.selected}] via-[#6bc916] to-[${GRAPH_CONFIG.colors.selected}] opacity-20` 
           : hasAIIssues 
-            ? 'from-[#ff6b6b] via-[#ff8787] to-[#ff6b6b] opacity-15' 
+            ? `from-[${GRAPH_CONFIG.colors.aiIssue}] via-[#ff8787] to-[${GRAPH_CONFIG.colors.aiIssue}] opacity-15` 
             : hasSchemaIssues
-              ? 'from-[#f7b731] via-[#ffc857] to-[#f7b731] opacity-10'
+              ? `from-[${GRAPH_CONFIG.colors.schemaIssue}] via-[#ffc857] to-[${GRAPH_CONFIG.colors.schemaIssue}] opacity-10`
               : ''
       }`} />
 
@@ -179,6 +195,12 @@ export const TableNode = memo(({ data }: TableNodeProps) => {
     </div>
     </>
   );
-});
+};
+
+/**
+ * Export memoized version with custom comparison
+ */
+export const TableNode = memo(TableNodeComponent, arePropsEqual);
 
 TableNode.displayName = 'TableNode';
+

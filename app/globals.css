@@ -125,6 +125,8 @@
 }
 
 @layer base {
+  @import "@xyflow/react/dist/style.css";
+
   * {
     @apply border-border outline-ring/50;
   }

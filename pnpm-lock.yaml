@@ -187,7 +187,7 @@ importers:
         specifier: 16.0.1
         version: 16.0.1(@typescript-eslint/parser@8.46.3(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
       tailwindcss:
-        specifier: ^4
+        specifier: ^4.1.17
         version: 4.1.17
       tw-animate-css:
         specifier: ^1.4.0

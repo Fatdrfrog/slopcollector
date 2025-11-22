@@ -53,6 +53,7 @@ export default function Home() {
   const [isGeneratingAdvice, setIsGeneratingAdvice] = useState(false);
   const [adviceError, setAdviceError] = useState<string>();
   const [showConnectDialog, setShowConnectDialog] = useState(false);
+  const [hasGeneratedBefore, setHasGeneratedBefore] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error' | 'loading';
     message: string;
@@ -66,6 +67,51 @@ export default function Home() {
   // Use remote data directly (already memoized in useDashboardData)
   const tables = remoteTables;
   const suggestions = remoteSuggestions;
+
+  // Check if suggestions have been generated before for this project
+  // This helps show the correct UI state (e.g., "No Active Suggestions" vs "Ready for AI Analysis")
+  useEffect(() => {
+    const checkHasGeneratedBefore = async () => {
+      if (!activeProjectId || !supabaseClient) {
+        setHasGeneratedBefore(false);
+        return;
+      }
+
+      try {
+        // Check if there are any suggestions or analysis jobs for this project
+        const [suggestionsResult, jobsResult] = await Promise.all([
+          supabaseClient
+            .from('optimization_suggestions')
+            .select('id', { count: 'exact', head: true })
+            .eq('project_id', activeProjectId)
+            .limit(1),
+          supabaseClient
+            .from('analysis_jobs')
+            .select('id', { count: 'exact', head: true })
+            .eq('project_id', activeProjectId)
+            .eq('job_type', 'ai_advice')
+            .eq('status', 'completed')
+            .limit(1),
+        ]);
+
+        const hasSuggestions = (suggestionsResult.count ?? 0) > 0;
+        const hasCompletedJobs = (jobsResult.count ?? 0) > 0;
+        setHasGeneratedBefore(hasSuggestions || hasCompletedJobs);
+      } catch (err) {
+        console.error('Error checking if suggestions exist:', err);
+        setHasGeneratedBefore(false);
+      }
+    };
+
+    void checkHasGeneratedBefore();
+  }, [activeProjectId, supabaseClient]);
+
+  // Also update hasGeneratedBefore when suggestions are loaded
+  useEffect(() => {
+    if (suggestions.length > 0) {
+      setHasGeneratedBefore(true);
+    }
+  }, [suggestions.length]);
 
   useEffect(() => {
     if (remoteTables.length > 0) {
@@ -155,6 +201,9 @@ export default function Home() {
       // Refresh to get the new suggestions AND updated schema
       // This ensures table issue coloring updates after advice generation
       await refresh();
+      
+      // Mark that suggestions have been generated
+      setHasGeneratedBefore(true);
       
       // Show suggestions panel if hidden
       setShowSuggestions(true);
@@ -320,7 +369,7 @@ export default function Home() {
                   <NoSuggestionsPrompt
                     onGenerateAdvice={handleGenerateAdvice}
                     isGenerating={isGeneratingAdvice}
-                    hasGeneratedBefore={false}
+                    hasGeneratedBefore={hasGeneratedBefore}
                   />
                 ) : (
                   <SuggestionsPanel

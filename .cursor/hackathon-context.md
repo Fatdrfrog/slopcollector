@@ -1,6 +1,5 @@
-## Supabase Lisbon AI Hackathon 2025 Context
+# Context
 
-- **Event**: 24-hour Supabase AI Hackathon, Lisbon 2025 (AI Week). Team has Supabase backend access and Figma Make for rapid UI design.
 - **Goal**: Ship a focused, defensible MVP with strong UX, clear PMF, and simple build scope. Stack target: Next.js + Tailwind + Supabase SDK + OpenAI.
 - **Judging Priorities**: Deep Supabase integration (auth, realtime, storage, edge functions), tangible business value, polished Figma-driven UI, open-source delivery with demo video.
 

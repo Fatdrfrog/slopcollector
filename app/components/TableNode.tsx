@@ -98,14 +98,14 @@ const TableNodeComponent = ({ data }: TableNodeProps) => {
       </NodeToolbar>
 
       <div
-        className={`relative bg-gradient-to-br from-[#1a1a1a] to-[#151515] rounded-xl shadow-2xl transition-all duration-200 ${
+        className={`relative bg-card text-card-foreground rounded-xl shadow-sm transition-all duration-200 ${
           isSelected 
-            ? `ring-2 ring-[${GRAPH_CONFIG.colors.selected}] shadow-[${GRAPH_CONFIG.colors.selected}]/30` 
+            ? `ring-2 ring-ring shadow-lg shadow-primary/20` 
             : hasAIIssues 
-              ? `ring-2 ring-[${GRAPH_CONFIG.colors.aiIssue}]/80 shadow-[${GRAPH_CONFIG.colors.aiIssue}]/20` 
+              ? `ring-2 ring-destructive/80 shadow-lg shadow-destructive/20` 
               : hasSchemaIssues
-                ? `ring-2 ring-[${GRAPH_CONFIG.colors.schemaIssue}]/60 shadow-[${GRAPH_CONFIG.colors.schemaIssue}]/10`
-                : 'ring-1 ring-[#3a3a3a]'
+                ? `ring-2 ring-yellow-500/60 shadow-lg shadow-yellow-500/10`
+                : 'ring-1 ring-border hover:ring-ring/50'
         }`}
         style={{ minWidth: '320px' }}
         onClick={handleClick}
@@ -113,11 +113,11 @@ const TableNodeComponent = ({ data }: TableNodeProps) => {
       {/* Gradient border effect for selected/issue states */}
       <div className={`absolute inset-0 rounded-xl bg-gradient-to-br opacity-0 transition-opacity duration-200 ${
         isSelected 
-          ? `from-[${GRAPH_CONFIG.colors.selected}] via-[#6bc916] to-[${GRAPH_CONFIG.colors.selected}] opacity-20` 
+          ? `from-primary via-primary/50 to-primary opacity-10` 
           : hasAIIssues 
-            ? `from-[${GRAPH_CONFIG.colors.aiIssue}] via-[#ff8787] to-[${GRAPH_CONFIG.colors.aiIssue}] opacity-15` 
+            ? `from-destructive via-destructive/50 to-destructive opacity-10` 
             : hasSchemaIssues
-              ? `from-[${GRAPH_CONFIG.colors.schemaIssue}] via-[#ffc857] to-[${GRAPH_CONFIG.colors.schemaIssue}] opacity-10`
+              ? `from-yellow-500 via-yellow-500/50 to-yellow-500 opacity-10`
               : ''
       }`} />
 

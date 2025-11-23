@@ -171,23 +171,19 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
         <Background
           gap={20}
           size={2}
-          color="#1f1f1f"
+          color="#333"
           variant={BackgroundVariant.Dots}
-          style={{ backgroundColor: '#0f0f0f' }}
+          className="bg-background"
         />
         
         <MiniMap
           nodeColor={getMiniMapNodeColor}
           nodeBorderRadius={4}
-          className="bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg shadow-lg"
-          maskColor="rgb(15, 15, 15, 0.8)"
+          className="!bg-card !border-border shadow-lg"
+          maskColor="rgba(0, 0, 0, 0.6)"
           position="bottom-right"
           pannable
           zoomable
-          style={{
-            backgroundColor: '#1a1a1a',
-            border: '1px solid #3a3a3a',
-          }}
         />
       </ReactFlow>
 

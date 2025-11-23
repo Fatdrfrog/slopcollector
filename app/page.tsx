@@ -395,7 +395,7 @@ export default function Home() {
             <ResizableHandle withHandle />
 
             {showSuggestions && (
-              <ResizablePanel defaultSize={30} minSize={25}>
+              <ResizablePanel defaultSize={25}>
               <motion.div
                 initial={{ x: 420, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}

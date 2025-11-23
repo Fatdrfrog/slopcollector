@@ -47,24 +47,24 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
   );
 
   return (
-    <div className="h-full border-l border-gray-800 bg-linear-to-b from-[#1a1a1a] to-[#151515] flex flex-col overflow-hidden w-full min-w-[320px]">
+    <div className="h-full border-l border-border bg-background flex flex-col overflow-hidden w-full min-w-[320px]">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-gray-800 bg-[#0f0f0f]/60 backdrop-blur-sm shrink-0">
-        <h2 className="text-gray-100 flex items-center gap-2.5">
-          <div className="p-1.5 bg-indigo-950/30 rounded-lg">
-            <TrendingUp className="w-4 h-4 text-indigo-400" />
+      <div className="px-5 py-4 border-b border-border bg-card/60 backdrop-blur-sm shrink-0">
+        <h2 className="text-foreground flex items-center gap-2.5">
+          <div className="p-1.5 bg-primary/10 rounded-lg">
+            <TrendingUp className="w-4 h-4 text-primary" />
           </div>
-          <span>Optimization Insights</span>
+          <span className="font-medium">Optimization Insights</span>
           {selectedTable && (
             <>
-              <span className="text-gray-700">·</span>
-              <code className="text-sm text-indigo-400 bg-indigo-950/30 px-2 py-0.5 rounded font-mono">
+              <span className="text-muted-foreground">·</span>
+              <code className="text-sm text-primary bg-primary/10 px-2 py-0.5 rounded font-mono">
                 {selectedTable.name}
               </code>
             </>
           )}
         </h2>
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-muted-foreground mt-2">
           {filteredSuggestions.length} optimization{filteredSuggestions.length !== 1 ? 's' : ''} detected
         </p>
       </div>
@@ -102,12 +102,12 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
 
 function EmptyState() {
   return (
-    <div className="p-8 text-center text-gray-500">
-      <div className="p-3 bg-gray-800/30 rounded-full w-fit mx-auto mb-3">
-        <Info className="w-6 h-6 text-gray-600" />
+    <div className="p-8 text-center text-muted-foreground">
+      <div className="p-3 bg-muted/30 rounded-full w-fit mx-auto mb-3">
+        <Info className="w-6 h-6 text-muted-foreground" />
       </div>
       <p>No suggestions for this selection</p>
-      <p className="text-xs text-gray-600 mt-1">Everything looks good!</p>
+      <p className="text-xs text-muted-foreground/80 mt-1">Everything looks good!</p>
     </div>
   );
 }
@@ -115,8 +115,8 @@ function EmptyState() {
 function LoadingState() {
   return (
     <div className="p-8 text-center">
-      <Loader2 className="w-8 h-8 text-[#7ed321] mx-auto mb-3 animate-spin" />
-      <p className="text-sm text-[#999]">Loading suggestions...</p>
+      <Loader2 className="w-8 h-8 text-primary mx-auto mb-3 animate-spin" />
+      <p className="text-sm text-muted-foreground">Loading suggestions...</p>
     </div>
   );
 }
@@ -130,14 +130,14 @@ interface SuggestionGroupProps {
 
 function SuggestionGroup({ severity, suggestions, onSelectTable, onStatusChange }: SuggestionGroupProps) {
   const dotColor = severity === 'error' 
-    ? 'bg-red-500' 
+    ? 'bg-destructive' 
     : severity === 'warning' 
-      ? 'bg-amber-500' 
+      ? 'bg-yellow-500' 
       : 'bg-blue-500';
 
   return (
     <div>
-      <div className="text-xs uppercase tracking-wider text-gray-600 mb-2.5 px-1 flex items-center gap-2">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2.5 px-1 flex items-center gap-2 font-medium">
         <div className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
         {severity} ({suggestions.length})
       </div>
@@ -161,22 +161,22 @@ interface SummaryStatsProps {
 
 function SummaryStats({ groupedSuggestions }: SummaryStatsProps) {
   return (
-    <div className="px-5 py-4 border-t border-gray-800 bg-[#0f0f0f]/60 backdrop-blur-sm">
+    <div className="px-5 py-4 border-t border-border bg-card/60 backdrop-blur-sm">
       <div className="grid grid-cols-3 gap-3">
         <StatCard
           count={(groupedSuggestions.error || []).length}
           label="Critical"
-          color="red"
+          variant="destructive"
         />
         <StatCard
           count={(groupedSuggestions.warning || []).length}
           label="Warnings"
-          color="amber"
+          variant="warning"
         />
         <StatCard
           count={(groupedSuggestions.info || []).length}
           label="Info"
-          color="blue"
+          variant="info"
         />
       </div>
     </div>
@@ -186,18 +186,20 @@ function SummaryStats({ groupedSuggestions }: SummaryStatsProps) {
 interface StatCardProps {
   count: number;
   label: string;
-  color: 'red' | 'amber' | 'blue';
+  variant: 'destructive' | 'warning' | 'info';
 }
 
-function StatCard({ count, label, color }: StatCardProps) {
-  const bgColor = `bg-${color}-950/20`;
-  const borderColor = `border-${color}-900/30`;
-  const textColor = `text-${color}-400`;
+function StatCard({ count, label, variant }: StatCardProps) {
+  const variantStyles = {
+    destructive: "bg-destructive/10 border-destructive/20 text-destructive",
+    warning: "bg-yellow-500/10 border-yellow-500/20 text-yellow-500",
+    info: "bg-blue-500/10 border-blue-500/20 text-blue-500",
+  };
 
   return (
-    <div className={`${bgColor} border ${borderColor} rounded-lg p-3 text-center`}>
-      <div className={`text-xl ${textColor} mb-1`}>{count}</div>
-      <div className="text-xs text-gray-500">{label}</div>
+    <div className={`${variantStyles[variant]} border rounded-lg p-3 text-center`}>
+      <div className="text-xl font-semibold mb-1">{count}</div>
+      <div className="text-xs opacity-80">{label}</div>
     </div>
   );
 }

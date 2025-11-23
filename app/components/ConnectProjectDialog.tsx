@@ -91,7 +91,6 @@ export function ConnectProjectDialog({
   const router = useRouter();
   const [status, setStatus] = useState<FlowStatus>('input');
   const [error, setError] = useState<string>();
-  const [projectId, setProjectId] = useState<string>();
   const [projectName, setProjectName] = useState<string>();
   const [progress, setProgress] = useState({
     tablesFound: 0,
@@ -112,7 +111,6 @@ export function ConnectProjectDialog({
       setTimeout(() => {
         setStatus('input');
         setError(undefined);
-        setProjectId(undefined);
         setProjectName(undefined);
         setProgress({ tablesFound: 0, suggestionsGenerated: 0 });
         form.reset();
@@ -163,7 +161,7 @@ export function ConnectProjectDialog({
       }
 
       const { projectId: newProjectId } = await connectResponse.json();
-      setProjectId(newProjectId);
+
       setProjectName(derivedProjectName);
 
       clearTimeout(timeoutId);

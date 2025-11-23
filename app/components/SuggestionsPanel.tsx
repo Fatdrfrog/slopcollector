@@ -47,7 +47,7 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
   );
 
   return (
-    <div className="h-full border-l border-border bg-background flex flex-col overflow-hidden w-full min-w-[320px]">
+    <div className="h-full border-l border-border bg-background flex flex-col overflow-hidden w-full">
       {/* Header */}
       <div className="px-5 py-4 border-b border-border bg-card/60 backdrop-blur-sm shrink-0">
         <h2 className="text-foreground flex items-center gap-2.5">

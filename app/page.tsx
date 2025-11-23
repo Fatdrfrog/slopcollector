@@ -300,7 +300,6 @@ export default function Home() {
   // Handle OAuth callback codes that land on homepage (redirect to proper callback)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    console.log("test")
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     
@@ -395,29 +394,29 @@ export default function Home() {
             <ResizableHandle withHandle />
 
             {showSuggestions && (
-              <ResizablePanel defaultSize={25}>
-              <motion.div
-                initial={{ x: 420, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: 420, opacity: 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                className="h-full"
-              >
-                {suggestions.length === 0 && !loading ? (
-                  <NoSuggestionsPrompt
-                    onGenerateAdvice={handleGenerateAdvice}
-                    isGenerating={isGeneratingAdvice}
-                    hasGeneratedBefore={hasGeneratedBefore}
-                  />
-                ) : (
-                  <SuggestionsPanel
-                    suggestions={suggestions}
-                    selectedTable={selectedTableData}
-                    onSelectTable={handleTableSelect}
-                    isLoading={loading}
-                  />
-                )}
-              </motion.div>
+              <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+                <motion.div
+                  initial={{ x: 420, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: 420, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                  className="h-full"
+                >
+                  {suggestions.length === 0 && !loading ? (
+                    <NoSuggestionsPrompt
+                      onGenerateAdvice={handleGenerateAdvice}
+                      isGenerating={isGeneratingAdvice}
+                      hasGeneratedBefore={hasGeneratedBefore}
+                    />
+                  ) : (
+                    <SuggestionsPanel
+                      suggestions={suggestions}
+                      selectedTable={selectedTableData}
+                      onSelectTable={handleTableSelect}
+                      isLoading={loading}
+                    />
+                  )}
+                </motion.div>
               </ResizablePanel>
             )}
           </>

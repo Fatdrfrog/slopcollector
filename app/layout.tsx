@@ -21,9 +21,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
-        className={`${geistMono.variable} antialiased font-mono bg-[#1a1a1a] text-white`}
+        className={`${geistMono.variable} antialiased font-mono bg-background text-foreground`}
       >
         <ErrorBoundary>
           {children}

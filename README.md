@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🦝 SlopCollector
+
+> The raccoon that cleans up your database mess.
+
+SlopCollector is a developer tool that connects to your Supabase project, analyzes your schema, and uses AI to find missing indexes, catch slow queries, and suggest optimizations.
+
+![SlopCollector Dashboard](https://raw.githubusercontent.com/yourusername/slopcollector/main/public/demo.png)
+
+## Features
+
+-   **Schema Visualization:** Interactive ERD (Entity Relationship Diagram) of your database.
+-   **AI Analysis:** GPT analysis of your schema to find performance bottlenecks.
+-   **Index Suggestions:** Automatically detects missing foreign key indexes.
+-   **SQL Generation:** Generates ready-to-run SQL snippets to fix issues.
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+-   Node.js 18+
+-   A Supabase Project
+-   OpenAI API Key
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/Fatdrfrog/slopcollector.git
+    cd slopcollector
+    ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2.  Install dependencies:
+    ```bash
+    pnpm install
+    ```
 
-## Learn More
+3.  Set up environment variables:
+    Copy `.env.example` to `.env.local` and fill in your keys.
+    ```bash
+    cp .env.example .env.local
+    ```
 
-To learn more about Next.js, take a look at the following resources:
+    You will need:
+    -   `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase Project URL
+    -   `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase Anon Key
+    -   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Your Supabase Publishable Key
+    -   `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase Service Role Key (for introspection)
+    -   `SUPABASE_SECRET_KEY`: Your Supabase Secret Key
+    -   `OPENAI_API_KEY`: Your OpenAI API Key
+    -   `NEXT_PUBLIC_APP_URL`: The URL of your app (e.g. http://localhost:3000)
+    -   `CRON_SECRET`: Secret key for securing cron jobs
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4.  Run the development server:
+    ```bash
+    pnpm run dev
+    ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5.  Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Deploy on Vercel
+## Self-Hosting
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+You can easily deploy SlopCollector to Vercel.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyourusername%2Fslopcollector)
+
+## License
+
+MIT

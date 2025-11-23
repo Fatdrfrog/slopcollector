@@ -2,11 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { generateAdviceFromSnapshot, type CodePatternContext } from './generateAdvice';
 import type { DatabaseSchemaSnapshot } from '../supabase/introspect';
 
-/**
- * Shared service for generating AI advice
- * Used by both manual API endpoint and cron job
- */
-
 export interface GenerateAdviceResult {
   suggestions: Array<{
     tableName: string;
@@ -26,10 +21,6 @@ export interface GenerateAdviceResult {
   };
 }
 
-/**
- * Generate AI advice for a project
- * Single source of truth for advice generation logic
- */
 export async function generateAIAdviceForProject(
   serviceClient: SupabaseClient,
   projectId: string,
@@ -41,9 +32,8 @@ export async function generateAIAdviceForProject(
   }
 ): Promise<GenerateAdviceResult> {
   const cooldownHours = options?.cooldownHours ?? 6;
-  const includeCodePatterns = options?.includeCodePatterns ?? true; // Default to true
+  const includeCodePatterns = options?.includeCodePatterns ?? true;
 
-  // Check if we've generated advice recently (unless skipped)
   if (!options?.skipRecentCheck) {
     const cooldownTime = new Date(Date.now() - cooldownHours * 60 * 60 * 1000).toISOString();
     const { data: recentJob } = await serviceClient
@@ -64,7 +54,6 @@ export async function generateAIAdviceForProject(
     }
   }
 
-  // Get latest schema snapshot
   const { data: snapshot, error: snapshotError } = await serviceClient
     .from('schema_snapshots')
     .select('*')
@@ -77,14 +66,12 @@ export async function generateAIAdviceForProject(
     throw new Error('No schema snapshot found. Please sync your project first.');
   }
 
-  // Build DatabaseSchemaSnapshot from snapshot data
   const schemaSnapshot: DatabaseSchemaSnapshot = {
     tables: (snapshot.tables_data as any[]) || [],
     columns: (snapshot.columns_data as any[]) || [],
     indexes: (snapshot.indexes_data as any[]) || [],
   };
 
-  // Fetch code patterns if enabled
   let codePatterns: CodePatternContext[] | undefined;
   if (includeCodePatterns) {
     const { data: patterns } = await serviceClient
@@ -101,17 +88,14 @@ export async function generateAIAdviceForProject(
         lineNumber: p.line_number || undefined,
         frequency: p.frequency || 1,
       }));
-      console.log(`📊 Found ${codePatterns.length} code patterns for context-aware advice`);
     }
   }
 
-  // Generate AI suggestions using OpenAI
   const advice = await generateAdviceFromSnapshot(schemaSnapshot, {
     projectName: options?.projectName || 'Unnamed Project',
     codePatterns,
   });
 
-  // Convert to our format
   const suggestions = advice.advisories.map((item) => ({
     tableName: item.table || 'unknown',
     columnName: item.column,
@@ -129,10 +113,7 @@ export async function generateAIAdviceForProject(
   };
 }
 
-/**
- * Store generated suggestions in database
- * Handles deduplication and applied detection
- */
+
 export async function storeAdviceSuggestions(
   serviceClient: SupabaseClient,
   projectId: string,
@@ -146,7 +127,6 @@ export async function storeAdviceSuggestions(
   appliedDetected: number;
   skipped: number;
 }> {
-  // Get existing suggestions to avoid duplicates and detect applied ones
   const { data: existingSuggestions } = await serviceClient
     .from('optimization_suggestions')
     .select('*')
@@ -167,13 +147,11 @@ export async function storeAdviceSuggestions(
     const key = `${suggestion.tableName}:${suggestion.columnName || ''}:${suggestion.type}`;
     const existing = existingMap.get(key);
 
-    // Skip if user already applied or dismissed this suggestion
     if (existing && (existing.status === 'applied' || existing.status === 'dismissed')) {
       skipped++;
       continue;
     }
 
-    // Check if suggestion was auto-applied (user created the index manually)
     let wasApplied = false;
     if (options?.schemaSnapshot && suggestion.sqlSnippet) {
       wasApplied = checkIfSuggestionApplied(
@@ -185,14 +163,12 @@ export async function storeAdviceSuggestions(
 
     if (wasApplied) {
       if (existing && existing.status === 'pending') {
-        // Mark existing suggestion as applied
         appliedSuggestionIds.push(existing.id);
       }
       skipped++;
       continue;
     }
 
-    // Create new suggestion
     newSuggestions.push({
       project_id: projectId,
       snapshot_id: snapshotId,
@@ -209,7 +185,6 @@ export async function storeAdviceSuggestions(
     });
   }
 
-  // Mark auto-applied suggestions
   if (appliedSuggestionIds.length > 0) {
     await serviceClient
       .from('optimization_suggestions')
@@ -220,7 +195,6 @@ export async function storeAdviceSuggestions(
       .in('id', appliedSuggestionIds);
   }
 
-  // Insert new suggestions
   if (newSuggestions.length > 0) {
     const { error: insertError } = await serviceClient
       .from('optimization_suggestions')
@@ -238,22 +212,15 @@ export async function storeAdviceSuggestions(
   };
 }
 
-/**
- * Check if a suggestion was applied by the user
- * Compares suggested SQL with current schema state
- */
 function checkIfSuggestionApplied(
   remediation: string,
   snapshot: DatabaseSchemaSnapshot,
   tableName: string
 ): boolean {
-  // Extract index name from CREATE INDEX statement
   const indexNameMatch = remediation.match(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
-  if (!indexNameMatch) return false;
+  if (!indexNameMatch || !indexNameMatch[1]) return false;
 
   const suggestedIndexName = indexNameMatch[1].toLowerCase();
-
-  // Check if index exists in current schema
   const indexExists = snapshot.indexes.some(
     (idx) =>
       idx.indexName.toLowerCase() === suggestedIndexName &&
@@ -263,9 +230,6 @@ function checkIfSuggestionApplied(
   return indexExists;
 }
 
-/**
- * Map AI category to database suggestion_type
- */
 function mapCategoryToType(category: string): string {
   const map: Record<string, string> = {
     missing_index: 'missing_index',
@@ -281,11 +245,6 @@ function mapCategoryToType(category: string): string {
   return map[category] || 'other';
 }
 
-/**
- * Map AI severity to database severity
- * OpenAI returns: 'error', 'warning', 'info'
- * Database accepts: 'critical', 'high', 'medium', 'low'
- */
 function mapSeverityToDb(severity: string): string {
   const map: Record<string, string> = {
     error: 'critical',
@@ -295,9 +254,6 @@ function mapSeverityToDb(severity: string): string {
   return map[severity] || 'medium';
 }
 
-/**
- * Map severity to numeric score (0-100)
- */
 function mapEstimatedImpactToScore(severity: string): number | null {
   const map: Record<string, number> = {
     critical: 90,

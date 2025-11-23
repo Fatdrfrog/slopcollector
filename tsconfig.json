@@ -13,13 +13,26 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    // Stricter type checking
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
     "plugins": [
       {
         "name": "next"
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/app/*": ["./app/*"],
+      "@/components/*": ["./components/*"],
+      "@/lib/*": ["./lib/*"],
+      "@/hooks/*": ["./app/hooks/*"],
+      "@/store/*": ["./app/store/*"],
+      "@/types/*": ["./app/types/*"]
     }
   },
   "include": [

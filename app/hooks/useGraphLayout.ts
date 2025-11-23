@@ -1,7 +1,5 @@
 import { useMemo, useCallback, useState } from 'react';
-import type { Node, Edge } from '@xyflow/react';
 import type { Table, Suggestion } from '../types';
-import type { TableNodeData } from '../components/TableNode';
 import { generateNodesFromTables } from '../utils/nodeGenerator';
 import { generateEdgesFromTables } from '../utils/edgeGenerator';
 import { getLayoutedElements } from '../utils/layoutGraph';
@@ -37,36 +35,24 @@ export function useGraphLayout(
 ) {
   const [layoutVersion, setLayoutVersion] = useState(0);
 
-  /**
-   * Generate and layout nodes/edges
-   * Only recalculates when tables or suggestions change
-   */
   const { nodes, edges } = useMemo(() => {
     const cache = GraphCache.getInstance();
     const cacheKey = `layout-${tables.length}-${suggestions.length}-${layoutVersion}`;
     
-    // Check cache first
     const cachedLayout = cache.getCachedLayout(cacheKey);
     if (cachedLayout) {
-      console.log('📦 Using cached layout');
       return {
         nodes: cachedLayout.nodes,
         edges: cachedLayout.edges,
       };
     }
 
-    console.log('🔄 Calculating new layout...');
-    
-    // Generate nodes (without selection state - that's handled separately)
     const baseNodes = generateNodesFromTables(tables, null, () => {}, suggestions);
     
-    // Generate base edges
     const baseEdges = generateEdgesFromTables(tables);
     
-    // Calculate layout
     const layoutResult = getLayoutedElements(baseNodes, baseEdges, 'TB');
     
-    // Generate oriented edges with proper handle positions
     const orientedEdges = generateEdgesFromTables(tables, layoutResult.nodePositions);
     
     const result = {
@@ -74,7 +60,6 @@ export function useGraphLayout(
       edges: orientedEdges,
     };
 
-    // Cache the result
     cache.setCachedLayout(cacheKey, {
       ...layoutResult,
       edges: orientedEdges,
@@ -83,17 +68,10 @@ export function useGraphLayout(
     return result;
   }, [tables, suggestions, layoutVersion]);
 
-  /**
-   * Force a relayout (e.g., when user clicks relayout button)
-   */
   const relayout = useCallback(() => {
-    console.log('♻️ Manual relayout triggered');
     setLayoutVersion(v => v + 1);
   }, []);
 
-  /**
-   * Invalidate cache when tables change significantly
-   */
   const invalidateCache = useCallback(() => {
     const cache = GraphCache.getInstance();
     cache.invalidate();

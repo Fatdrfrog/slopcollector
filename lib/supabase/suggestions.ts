@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  */
 
 export type SuggestionStatus = 'pending' | 'applied' | 'dismissed' | 'archived';
+export type SuggestionSeverity = 'critical' | 'error' | 'warning' | 'info';
 
 export interface OptimizationSuggestion {
   id: string;

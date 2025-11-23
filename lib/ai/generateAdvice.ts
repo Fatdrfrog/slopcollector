@@ -3,10 +3,6 @@ import { z } from 'zod';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import type { DatabaseSchemaSnapshot, IndexSchema, TableSchema } from '../supabase/introspect';
 
-/**
- * Zod schema for strict validation of AI-generated advice
- * Ensures reliable, type-safe JSON structure
- */
 export const AdviceItemSchema = z.object({
   severity: z.enum(['error', 'warning', 'info']).describe('Criticality level of the issue'),
   category: z.enum([
@@ -203,14 +199,12 @@ export async function generateAdviceFromSnapshot(
   const temperature = options.temperature ?? 1;
   const payload = summarizeSnapshot(snapshot);
 
-  console.log(`🤖 Calling OpenAI API with model: ${model}`);
 
-  // Build code patterns context if provided
   let codeContext = '';
   if (options.codePatterns && options.codePatterns.length > 0) {
     const patterns = options.codePatterns
-      .sort((a, b) => b.frequency - a.frequency) // Sort by frequency (highest first)
-      .slice(0, 100) // Limit to top 100 patterns
+      .sort((a, b) => b.frequency - a.frequency)
+      .slice(0, 100)
       .map((p) => 
         `  - ${p.tableName}.${p.columnName || '*'} used in ${p.patternType.toUpperCase()} at ${p.filePath}${p.lineNumber ? `:${p.lineNumber}` : ''} (${p.frequency}x)`
       )
@@ -247,14 +241,11 @@ ${options.codePatterns && options.codePatterns.length > 0 ? `1. HIGH PRIORITY: C
 
 Provide actionable, high-impact optimization recommendations${options.codePatterns && options.codePatterns.length > 0 ? ', prioritizing columns with proven usage in the codebase' : ''}.`;
 
-  // GPT-5 reasoning token management
-  // GPT-5 "thinks" internally before responding, consuming tokens for reasoning
-  // If max_tokens is too low, GPT-5 uses all tokens for reasoning → empty response
-  // Solution: Allocate enough tokens for BOTH reasoning + output
+
   const isGPT5 = model.toLowerCase().includes('gpt-5');
   const maxTokens = isGPT5 
-    ? 16000  // GPT-5: ~8000-12000 for reasoning + 4000-8000 for output
-    : 4000;  // GPT-4/other: normal allocation
+    ? 16000  
+    : 4000; 
 
   let response;
   try {
@@ -279,27 +270,10 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
   const finishReason = choice?.finish_reason;
   const usage = response.usage;
 
-  // Log token usage (especially reasoning tokens for GPT-5)
-  console.log(`✅ OpenAI response received:`, {
-    model: response.model,
-    finishReason,
-    totalTokens: usage?.total_tokens,
-    completionTokens: usage?.completion_tokens,
-    // @ts-ignore - reasoning_tokens might not be in types yet
-    reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens,
-  });
 
-  // Handle GPT-5 reasoning token exhaustion
   if (!choice?.message?.content && finishReason === 'length') {
-    // @ts-ignore
     const reasoningTokens = usage?.completion_tokens_details?.reasoning_tokens || 0;
-    const suggestedTokens = Math.ceil((reasoningTokens + 2000) * 1.2); // 20% buffer
-
-    console.error('❌ GPT-5 used all tokens for reasoning, no output produced!', {
-      reasoningTokens,
-      maxTokensUsed: maxTokens,
-      suggestedMinimum: suggestedTokens,
-    });
+    const suggestedTokens = Math.ceil((reasoningTokens + 2000) * 1.2);
 
     throw new Error(
       `[GPT-5 Notice] Model used all ${maxTokens} tokens for internal reasoning (${reasoningTokens} reasoning tokens). ` +
@@ -310,32 +284,22 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
 
   const content = choice?.message?.content;
   if (!content) {
-    console.error('❌ Empty content in response:', {
-      choices: response.choices,
-      model: response.model,
-      usage: response.usage,
-      finishReason,
-    });
     throw new Error(
       `Empty response from OpenAI. Model: ${model}, Finish reason: ${finishReason || 'none'}`
     );
   }
 
-  // Parse JSON (Structured Outputs guarantees valid JSON)
   let rawParsed: unknown;
   try {
     rawParsed = JSON.parse(content);
   } catch (error) {
     throw new Error(`Failed to parse JSON: ${(error as Error).message}`);
   }
-
-  // Validate with Zod (should always pass with Structured Outputs)
   const validationResult = GeneratedAdviceSchema.safeParse(rawParsed);
   
   if (!validationResult.success) {
     console.error('❌ Zod validation failed (unexpected with Structured Outputs):', validationResult.error);
     
-    // Fallback: Try to salvage what we can
     const fallback = rawParsed as any;
     return {
       summary: fallback?.summary || 'Schema analysis completed',
@@ -346,7 +310,6 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
     };
   }
 
-  console.log(`✅ Generated ${validationResult.data.advisories.length} optimization suggestions`);
   return validationResult.data;
 }
 
@@ -422,7 +385,6 @@ function summarizeSnapshot(snapshot: DatabaseSchemaSnapshot) {
     {}
   );
 
-  // Extract foreign key relationships
   const foreignKeys: Array<{
     sourceTable: string;
     sourceColumn: string;
@@ -432,7 +394,15 @@ function summarizeSnapshot(snapshot: DatabaseSchemaSnapshot) {
 
   snapshot.columns.forEach((column) => {
     if (column.foreignKeyTo) {
-      const [targetTable, targetColumn] = column.foreignKeyTo.split('.');
+      const parts = column.foreignKeyTo.split('.');
+      const targetTable = parts[0];
+      const targetColumn = parts[1];
+      
+      if (!targetTable || !targetColumn) {
+        console.warn(`Invalid foreign key format: ${column.foreignKeyTo}`);
+        return;
+      }
+      
       foreignKeys.push({
         sourceTable: column.tableName,
         sourceColumn: column.columnName,
@@ -472,7 +442,6 @@ function summarizeSnapshot(snapshot: DatabaseSchemaSnapshot) {
         definition: getIndexDefinition(index as IndexSchema & IndexSchemaWithDefinition),
       }));
 
-      // Find foreign keys for this table
       const tableForeignKeys = foreignKeys.filter(
         (fk) => fk.sourceTable === table.tableName
       );
@@ -491,9 +460,6 @@ function summarizeSnapshot(snapshot: DatabaseSchemaSnapshot) {
   };
 }
 
-/**
- * Wrapper for advice generation API
- */
 export async function generateAdviceForSchema(input: { tables: any[]; indexes: any[] }) {
   const snapshot: DatabaseSchemaSnapshot = {
     tables: input.tables,
@@ -503,7 +469,6 @@ export async function generateAdviceForSchema(input: { tables: any[]; indexes: a
 
   const advice = await generateAdviceFromSnapshot(snapshot);
 
-  // Convert to optimization suggestions format
   return advice.advisories.map((item) => ({
     tableName: item.table || 'unknown',
     columnName: item.column,

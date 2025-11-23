@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getUsageEntitlement } from '@/lib/commerce/stripe';
 import { getServiceClient } from '@/lib/supabase/serviceClient';
 import { getServerClient } from '@/lib/supabase/server';
 
@@ -8,10 +7,6 @@ interface AdviceRequestBody {
   async?: boolean;
 }
 
-/**
- * Generate AI advice for a connected project
- * Simplified for credential-based auth
- */
 export async function POST(request: Request) {
   const body = (await request.json()) as AdviceRequestBody;
   const supabase = await getServerClient();
@@ -43,7 +38,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verify user owns this project
   const { data: project, error: projectError } = await serviceClient
     .from('connected_projects')
     .select('*')
@@ -58,29 +52,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Check usage limits (free tier by default, Stripe optional)
-  const entitlement = getUsageEntitlement();
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  
-  const { count: jobCount } = await serviceClient
-    .from('analysis_jobs')
-    .select('id', { count: 'exact', head: true })
-    .eq('project_id', project.id)
-    .eq('job_type', 'ai_advice')
-    .gte('created_at', since);
-
-  if (typeof jobCount === 'number' && jobCount >= entitlement.aiRunsPerDay) {
-    return NextResponse.json(
-      {
-        error: 'Daily AI advice quota reached',
-        allowed: entitlement.aiRunsPerDay,
-        message: 'Try again tomorrow or upgrade to Pro',
-      },
-      { status: 429 }
-    );
-  }
-
-  // Create analysis job
   const { data: job, error: jobError } = await serviceClient
     .from('analysis_jobs')
     .insert({
@@ -99,17 +70,14 @@ export async function POST(request: Request) {
     );
   }
 
-  // Generate AI advice
   try {
     const { generateAIAdviceForProject, storeAdviceSuggestions } = await import('@/lib/ai/adviceService');
     
-    // Generate suggestions
     const result = await generateAIAdviceForProject(serviceClient, project.id, {
       projectName: project.project_name || undefined,
-      skipRecentCheck: false, // Enforce cooldown
+      skipRecentCheck: false,
     });
 
-    // Get snapshot for storage
     const { data: snapshot } = await serviceClient
       .from('schema_snapshots')
       .select('id, tables_data, columns_data, indexes_data')
@@ -122,7 +90,6 @@ export async function POST(request: Request) {
       throw new Error('No schema snapshot found');
     }
 
-    // Store suggestions with deduplication and applied detection
     const storeResult = await storeAdviceSuggestions(
       serviceClient,
       project.id,
@@ -137,7 +104,6 @@ export async function POST(request: Request) {
       }
     );
 
-    // Update job status
     await serviceClient
       .from('analysis_jobs')
       .update({
@@ -161,7 +127,6 @@ export async function POST(request: Request) {
   } catch (adviceError) {
     console.error('AI advice generation error:', adviceError);
     
-    // Update job status to failed
     await serviceClient
       .from('analysis_jobs')
       .update({

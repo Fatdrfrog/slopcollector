@@ -1,9 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-/**
- * Supabase Schema Introspection
- * Uses PostgREST OpenAPI spec - works with just URL + anon key
- */
 
 export interface ColumnSchema {
   schema: string;
@@ -13,7 +9,7 @@ export interface ColumnSchema {
   isNullable: boolean;
   columnDefault: string | null;
   isPrimaryKey?: boolean;
-  foreignKeyTo?: string; // Format: "table.column"
+  foreignKeyTo?: string; 
 }
 
 export interface TableSchema {
@@ -38,10 +34,6 @@ export interface DatabaseSchemaSnapshot {
   indexes: IndexSchema[];
 }
 
-/**
- * Get table list from Supabase OpenAPI specification
- * This ALWAYS works with just the anon key!
- */
 export async function getSimpleTableList(
   supabaseUrl: string,
   supabaseKey: string
@@ -71,10 +63,6 @@ export async function getSimpleTableList(
   }
 }
 
-/**
- * Get actual foreign key constraints from PostgreSQL pg_catalog
- * Queries the system tables to get exact FK relationships
- */
 async function getRealForeignKeyConstraints(
   supabaseUrl: string,
   supabaseKey: string
@@ -84,8 +72,7 @@ async function getRealForeignKeyConstraints(
   try {
     const client = createClient(supabaseUrl, supabaseKey);
     
-    // Use Supabase's metadata API or query pg_catalog directly
-    // This SQL queries the actual foreign key constraints
+
     const { data, error } = await client
       .from('pg_catalog.pg_constraint')
       .select(`
@@ -95,12 +82,11 @@ async function getRealForeignKeyConstraints(
         conkey,
         confkey
       `)
-      .eq('contype', 'f'); // 'f' = foreign key
+      .eq('contype', 'f'); 
 
     if (error) {
       console.warn('Could not access pg_catalog, trying alternative method...');
       
-      // Alternative: Parse from table metadata in OpenAPI spec
       const response = await fetch(`${supabaseUrl}/rest/v1/`, {
         headers: {
           'apikey': supabaseKey,
@@ -112,12 +98,11 @@ async function getRealForeignKeyConstraints(
       if (response.ok) {
         const spec = await response.json();
         
-        // PostgREST includes relationship info in definitions
         if (spec.definitions) {
           for (const [tableName, tableDef] of Object.entries(spec.definitions as Record<string, any>)) {
             if (tableDef.properties) {
               for (const [columnName, prop] of Object.entries(tableDef.properties as Record<string, any>)) {
-                // Check for format: "table_name:fk_constraint_name"
+                
                 if (prop.description && prop.description.includes('Note:')) {
                   const match = prop.description.match(/References `(\w+)\.(\w+)`/i);
                   if (match) {
@@ -125,7 +110,6 @@ async function getRealForeignKeyConstraints(
                     const key = `${tableName}.${columnName}`;
                     const value = `${targetTable}.${targetColumn}`;
                     fkMap.set(key, value);
-                    console.log(`🔗 FK from OpenAPI: ${key} → ${value}`);
                   }
                 }
               }
@@ -135,9 +119,6 @@ async function getRealForeignKeyConstraints(
       }
     }
     
-    if (fkMap.size > 0) {
-      console.log(`✅ Found ${fkMap.size} FK constraints`);
-    }
   } catch (error) {
     console.warn('Error querying FK constraints:', error);
   }
@@ -145,20 +126,13 @@ async function getRealForeignKeyConstraints(
   return fkMap;
 }
 
-/**
- * Get column details from OpenAPI specification
- * Extracts column info from the definitions section
- * Now also fetches real foreign key constraints from information_schema
- */
 export async function getColumnsFromOpenAPI(
   supabaseUrl: string,
   supabaseKey: string,
   tableNames: string[]
 ): Promise<ColumnSchema[]> {
   try {
-    // First, get real foreign key constraints from PostgreSQL
     const fkMap = await getRealForeignKeyConstraints(supabaseUrl, supabaseKey);
-    console.log(`🔗 Loaded ${fkMap.size} foreign key constraints`);
 
     const response = await fetch(`${supabaseUrl}/rest/v1/`, {
       headers: {
@@ -187,7 +161,6 @@ export async function getColumnsFromOpenAPI(
         Object.keys(properties).forEach((columnName) => {
           const prop = properties[columnName];
           
-          // Map OpenAPI/JSON schema types to PostgreSQL types
           let pgType = 'unknown';
           if (prop.type === 'integer' || prop.type === 'number') {
             pgType = prop.format === 'int8' || prop.format === 'bigint' ? 'bigint' : 'integer';
@@ -206,15 +179,12 @@ export async function getColumnsFromOpenAPI(
             pgType = prop.items?.type ? `${prop.items.type}[]` : 'array';
           }
           
-          // Check for FK from metadata first, then use smart heuristics
           const fkKey = `${tableName}.${columnName}`;
           let foreignKeyTo: string | undefined = fkMap.get(fkKey);
           
-          // Smart FK detection if not found in metadata
           if (!foreignKeyTo && prop.format === 'uuid' && columnName.endsWith('_id') && columnName !== 'id') {
             const baseName = columnName.replace(/_id$/, '');
             
-            // Build comprehensive list of possible table names
             const possibleNames = new Set<string>([
               baseName,                                      // exact: user_id → user
               `${baseName}s`,                               // plural: user_id → users
@@ -235,18 +205,12 @@ export async function getColumnsFromOpenAPI(
               baseName.replace(/child$/, 'children'),      // child_id → children
             ]);
             
-            // Find exact match (case-insensitive)
             for (const possibleName of possibleNames) {
               const actualTable = tableNames.find(t => t.toLowerCase() === possibleName.toLowerCase());
               if (actualTable) {
                 foreignKeyTo = `${actualTable}.id`;
-                console.log(`✅ FK matched: ${tableName}.${columnName} → ${foreignKeyTo}`);
                 break;
               }
-            }
-            
-            if (!foreignKeyTo) {
-              console.warn(`⚠️ FK column found but no matching table: ${tableName}.${columnName} (base: ${baseName}, tried ${possibleNames.size} variations)`);
             }
           }
           
@@ -268,8 +232,6 @@ export async function getColumnsFromOpenAPI(
       }
     }
     
-    console.log(`✅ Detected ${fkCount} foreign key relationships across ${tableNames.length} tables`);
-
     return allColumns;
   } catch (error) {
     console.error('Error getting columns from OpenAPI:', error);
@@ -277,21 +239,14 @@ export async function getColumnsFromOpenAPI(
   }
 }
 
-/**
- * Main introspection function
- * Simple, clean, reliable - uses only OpenAPI spec
- */
 export async function introspectSupabaseProject(
   supabaseUrl: string,
   supabaseKey: string,
   targetSchema = 'public'
 ): Promise<DatabaseSchemaSnapshot> {
-  console.log('🔍 Starting schema introspection for', supabaseUrl);
   
   try {
-    // Get table names
     const tableNames = await getSimpleTableList(supabaseUrl, supabaseKey);
-    console.log(`✅ Found ${tableNames.length} tables`);
 
     if (tableNames.length === 0) {
       return {
@@ -301,9 +256,7 @@ export async function introspectSupabaseProject(
       };
     }
 
-    // Get column details
     const columns = await getColumnsFromOpenAPI(supabaseUrl, supabaseKey, tableNames);
-    console.log(`✅ Found ${columns.length} columns`);
 
     const tables: TableSchema[] = tableNames.map(name => ({
       schema: targetSchema,

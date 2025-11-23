@@ -31,9 +31,6 @@ export function getLayoutedElements(
   const { node: nodeConfig, layout: layoutConfig } = GRAPH_CONFIG;
   const hasEdges = edges.length > 0;
   
-  // Configure dagre for better ERD layout
-  // With edges: creates proper hierarchical layout (parent tables above children)
-  // Without edges: falls back to grid layout
   dagreGraph.setGraph({
     rankdir: direction,
     nodesep: hasEdges ? layoutConfig.nodesep.withEdges : layoutConfig.nodesep.withoutEdges,
@@ -46,9 +43,7 @@ export function getLayoutedElements(
     ranker: hasEdges ? 'tight-tree' : 'network-simplex',
   });
   
-  console.log(`📐 Layout config: ${edges.length} edges, ${nodes.length} nodes, direction: ${direction}`);
-
-  // Add nodes to graph with dynamic heights based on column count
+  
   nodes.forEach((node) => {
     const columnCount = node.data?.table?.columns?.length || 5;
     const dynamicHeight = Math.max(
@@ -62,21 +57,13 @@ export function getLayoutedElements(
     });
   });
 
-  // Add edges to graph
-  // Note: In React Flow, edges go FROM source TO target
-  // For FK relationships: child table (source) → parent table (target)
-  // For dagre layout with TB direction: we want parent above child
-  // So we reverse the edge direction for dagre layout only
+
   edges.forEach((edge) => {
-    // Reverse edge for dagre: parent → child (so parent appears above)
-    // React Flow will still render the visual edge correctly (child → parent)
     dagreGraph.setEdge(edge.target, edge.source);
   });
 
-  // Calculate layout
   dagre.layout(dagreGraph);
 
-  // Apply calculated positions to nodes
   const nodePositions = new Map<string, { x: number; y: number }>();
   const layoutedNodes = nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);

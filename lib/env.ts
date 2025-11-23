@@ -5,7 +5,6 @@ interface ServerEnv {
   supabasePublishableKey: string;
   supabaseSecretKey: string;
   openaiApiKey?: string;
-  stripeSecretKey?: string;
 }
 
 export function getServerEnv(): ServerEnv {
@@ -17,7 +16,6 @@ export function getServerEnv(): ServerEnv {
     supabasePublishableKey,
     supabaseSecretKey,
     openaiApiKey: process.env.OPENAI_API_KEY,
-    stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   };
 }
 

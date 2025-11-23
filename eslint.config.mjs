@@ -1,18 +1,45 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import pluginQuery from '@tanstack/eslint-plugin-query';
+import * as pluginImport from 'eslint-plugin-import';
+import nextConfig from 'eslint-config-next/core-web-vitals.js';
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-]);
+export default [
+  ...nextConfig,
+  {
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    plugins: {
+      '@tanstack/query': pluginQuery,
+      'import': pluginImport,
+    },
+    rules: {
+      // React Query best practices
+      '@tanstack/query/exhaustive-deps': 'error',
+      '@tanstack/query/no-rest-destructuring': 'warn',
+      '@tanstack/query/stable-query-client': 'error',
 
-export default eslintConfig;
+      // Import organization
+      'import/order': [
+        'error',
+        {
+          groups: [
+            'builtin',
+            'external',
+            'internal',
+            ['parent', 'sibling'],
+            'index',
+          ],
+          'newlines-between': 'always',
+          alphabetize: {
+            order: 'asc',
+            caseInsensitive: true,
+          },
+        },
+      ],
+      'import/no-duplicates': 'error',
+
+      // General best practices
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'prefer-const': 'error',
+      'no-var': 'error',
+    },
+  },
+];

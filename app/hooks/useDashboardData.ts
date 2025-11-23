@@ -54,7 +54,8 @@ export function useDashboardData(projectId?: string): DashboardData {
         }
         index.columns.forEach((column) => {
           const normalized = column.replace(/"/g, '').split(' ')[0];
-          acc[key].add(normalized);
+          // Non-null assertion safe because we just created it if it didn't exist
+          acc[key]!.add(normalized!);
         });
         return acc;
       },

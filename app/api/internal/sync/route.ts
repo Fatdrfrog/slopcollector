@@ -44,9 +44,6 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-
-    // Introspect using the clean library function
-    console.log(`Introspecting project: ${project.project_name}`);
     
     const schema = await introspectSupabaseProject(
       project.supabase_url,
@@ -60,17 +57,14 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`✅ Introspected: ${schema.tables.length} tables, ${schema.columns.length} columns`);
-
-    // Store schema snapshot with columns
     const { data: snapshot, error: snapshotError } = await serviceClient
       .from('schema_snapshots')
       .insert({
         project_id: project.id,
         tables_data: schema.tables,
-        columns_data: schema.columns, // Store columns!
+        columns_data: schema.columns,
         indexes_data: schema.indexes,
-        relationships_data: [], // Will implement later
+        relationships_data: [], // WIP: Will implement later
         created_at: new Date().toISOString(),
       })
       .select('*')

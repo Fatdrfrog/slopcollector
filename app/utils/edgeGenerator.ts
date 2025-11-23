@@ -5,14 +5,6 @@ import { needsIndex } from './tableAnalysis';
 import { GraphCache } from './graphCache';
 import { GRAPH_CONFIG } from './graphConfig';
 
-/**
- * Calculate optimal handle positions based on node positions
- * Determines which side of nodes to connect based on their relative positions
- * 
- * @param sourcePos - Position of source node
- * @param targetPos - Position of target node
- * @returns Handle positions for source and target
- */
 function calculateHandlePositions(
   sourcePos: Position,
   targetPos: Position
@@ -21,27 +13,18 @@ function calculateHandlePositions(
   const dy = targetPos.y - sourcePos.y;
 
   if (Math.abs(dx) > Math.abs(dy)) {
-    // Horizontal orientation
     if (dx > 0) {
       return { sourceHandle: 'right', targetHandle: 'left-target' };
     }
     return { sourceHandle: 'left', targetHandle: 'right-target' };
   }
 
-  // Vertical orientation
   if (dy > 0) {
     return { sourceHandle: 'bottom', targetHandle: 'top-target' };
   }
   return { sourceHandle: 'top', targetHandle: 'bottom-target' };
 }
 
-/**
- * Build table lookup map for fast table resolution
- * Caches result in singleton for reuse across calls
- * 
- * @param tables - Array of tables
- * @returns Map of lowercase table names/IDs to actual table IDs
- */
 function buildTableLookup(tables: Table[]): Map<string, string> {
   const cache = GraphCache.getInstance();
   const cacheKey = `table-lookup-${tables.length}`;
@@ -59,14 +42,6 @@ function buildTableLookup(tables: Table[]): Map<string, string> {
   return lookup;
 }
 
-/**
- * Resolve target table ID from foreign key reference
- * Tries multiple naming variations (plural, singular, etc.)
- * 
- * @param targetTableName - Referenced table name from FK
- * @param tableLookup - Lookup map for table resolution
- * @returns Resolved table ID or undefined if not found
- */
 function resolveTargetTable(
   targetTableName: string,
   tableLookup: Map<string, string>
@@ -89,19 +64,6 @@ function resolveTargetTable(
   return undefined;
 }
 
-/**
- * Generate React Flow edges from table foreign key relationships
- * Creates proper ERD diagram connections with optimized caching
- * 
- * @param tables - Array of tables to analyze for relationships
- * @param nodePositions - Optional node positions for optimal edge routing
- * @returns Array of React Flow edges
- * 
- * @example
- * const edges = generateEdgesFromTables(tables);
- * // With positions for better routing:
- * const edges = generateEdgesFromTables(tables, nodePositions);
- */
 export function generateEdgesFromTables(
   tables: Table[],
   nodePositions?: Map<string, Position>
@@ -109,7 +71,6 @@ export function generateEdgesFromTables(
   const cache = GraphCache.getInstance();
   const cacheKey = `edges-${tables.length}-${nodePositions ? 'positioned' : 'base'}`;
   
-  // Check cache first
   const cached = cache.getCachedEdges(cacheKey);
   if (cached) return cached;
 
@@ -125,12 +86,19 @@ export function generateEdgesFromTables(
       if (!column.foreignKey) return;
 
       fkCount++;
-      const [targetTableName] = column.foreignKey.split('.');
+      const parts = column.foreignKey.split('.');
+      const targetTableName = parts[0];
+      
+      if (!targetTableName) {
+        console.warn(`Invalid foreign key format: ${column.foreignKey}`);
+        return;
+      }
+      
       const actualTargetId = resolveTargetTable(targetTableName, tableLookup);
 
       if (!actualTargetId) {
         console.warn(
-          `⚠️  FK reference to missing table: ${table.name}.${column.name} → ${targetTableName}`
+          `FK reference to missing table: ${table.name}.${column.name} → ${targetTableName}`
         );
         return;
       }
@@ -138,7 +106,6 @@ export function generateEdgesFromTables(
       edgeCount++;
       const isMissingIndex = needsIndex(column);
       
-      // Calculate handle positions if node positions are available
       const defaultHandles: HandlePositions = { 
         sourceHandle: 'bottom', 
         targetHandle: 'top-target' 
@@ -191,15 +158,6 @@ export function generateEdgesFromTables(
     });
   });
 
-  console.log(`✅ Generated ${edgeCount} edges from ${fkCount} foreign key columns`);
-  if (edgeCount === 0 && fkCount > 0) {
-    console.error(`❌ No edges created despite ${fkCount} FK columns found!`);
-    console.log(`Available tables:`, tables.map((t) => t.name));
-  } else if (edgeCount > 0) {
-    console.log(`🎉 Successfully connected ${edgeCount} relationships in ERD!`);
-  }
-
-  // Cache the result
   cache.setCachedEdges(cacheKey, edges);
   
   return edges;

@@ -82,8 +82,6 @@ export async function POST(request: Request) {
       relationshipCount: relationships.length,
     };
 
-    console.log(`📊 Introspection stats:`, statistics);
-
     // Save snapshot with relationships
     const { data: insertedSnapshot, error: insertError } = await serviceClient
       .from('schema_snapshots')

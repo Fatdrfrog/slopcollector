@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { Header } from './components/Header';
 import { ERDCanvas } from './components/ERDCanvas';
@@ -12,12 +11,16 @@ import { StatusIndicator } from './components/StatusIndicator';
 import { DebugPanel } from './components/DebugPanel';
 import { NoSuggestionsPrompt } from './components/NoSuggestionsPrompt';
 import { ConnectProjectDialog } from './components/ConnectProjectDialog';
+import { LoadingScreen } from './components/LoadingScreen';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTableNavigation } from './hooks/useTableNavigation';
-import { useDashboardData } from './hooks/useDashboardData';
+import { useDashboard } from '@/app/hooks/queries';
 import { useProjects } from './hooks/useProjects';
 import { useSupabaseSession } from './hooks/useSupabaseSession';
 import { useSupabaseClient } from '@/lib/auth/hooks';
+import { useAdviceGeneration } from './hooks/useAdviceGeneration';
+import { useProjectState } from './hooks/useProjectState';
+import { useAuthRedirect } from './hooks/useAuthRedirect';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -28,7 +31,6 @@ import {
  * Main application component for the ERD Panel
  */
 export default function Home() {
-  const router = useRouter();
   const {
     projects,
     activeProjectId,
@@ -37,133 +39,43 @@ export default function Home() {
     error: projectsError,
   } = useProjects();
   const {
-    tables: remoteTables,
-    suggestions: remoteSuggestions,
+    tables,
+    suggestions,
     loading,
     error,
     refresh,
-  } = useDashboardData(activeProjectId);
+  } = useDashboard(activeProjectId);
   const { user, loading: authLoading } = useSupabaseSession();
   const supabaseClient = useSupabaseClient();
 
-  const [isConnected, setIsConnected] = useState(false);
+  // UI state
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [isGeneratingAdvice, setIsGeneratingAdvice] = useState(false);
-  const [adviceError, setAdviceError] = useState<string>();
   const [showConnectDialog, setShowConnectDialog] = useState(false);
-  const [hasGeneratedBefore, setHasGeneratedBefore] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{
-    type: 'success' | 'error' | 'loading';
-    message: string;
-  } | null>(null);
+
+  // Extract project state management to custom hook first
+  const { hasGeneratedBefore, setHasGeneratedBefore } = useProjectState(
+    activeProjectId,
+    suggestions.length
+  );
+
+  // Extract AI advice generation logic to custom hook
+  const {
+    isGeneratingAdvice,
+    adviceError,
+    statusMessage,
+    setStatusMessage,
+    handleGenerateAdvice,
+  } = useAdviceGeneration(activeProjectId, refresh, setHasGeneratedBefore, setShowSuggestions);
+
+  // Extract auth redirect logic to custom hook
+  const { isProcessingCallback } = useAuthRedirect(user, authLoading);
 
   // Memoize table selection handler to prevent ERDCanvas re-renders
   const handleTableSelect = useCallback((tableId: string | null) => {
     setSelectedTable(tableId);
   }, []);
-
-  // Use remote data directly (already memoized in useDashboardData)
-  const tables = remoteTables;
-  const suggestions = remoteSuggestions;
-
-  // Check if suggestions have been generated before for this project
-  // This helps show the correct UI state (e.g., "No Active Suggestions" vs "Ready for AI Analysis")
-  useEffect(() => {
-    const checkState = async () => {
-      if (!activeProjectId || !supabaseClient) {
-        setHasGeneratedBefore(false);
-        return;
-      }
-
-      try {
-        // Check if there are any suggestions or analysis jobs for this project
-        const [suggestionsResult, completedJobsResult, pendingJobsResult] = await Promise.all([
-          supabaseClient
-            .from('optimization_suggestions')
-            .select('id', { count: 'exact', head: true })
-            .eq('project_id', activeProjectId)
-            .limit(1),
-          supabaseClient
-            .from('analysis_jobs')
-            .select('id', { count: 'exact', head: true })
-            .eq('project_id', activeProjectId)
-            .eq('job_type', 'ai_advice')
-            .eq('status', 'completed')
-            .limit(1),
-          supabaseClient
-            .from('analysis_jobs')
-            .select('id', { count: 'exact', head: true })
-            .eq('project_id', activeProjectId)
-            .eq('job_type', 'ai_advice')
-            .eq('status', 'pending')
-            .limit(1),
-        ]);
-
-        const hasSuggestions = (suggestionsResult.count ?? 0) > 0;
-        const hasCompletedJobs = (completedJobsResult.count ?? 0) > 0;
-        const hasPendingJobs = (pendingJobsResult.count ?? 0) > 0;
-
-        setHasGeneratedBefore(hasSuggestions || hasCompletedJobs);
-        
-        if (hasPendingJobs) {
-          setIsGeneratingAdvice(true);
-          setStatusMessage({ type: 'loading', message: 'AI analysis in progress...' });
-        }
-      } catch (err) {
-        console.error('Error checking project state:', err);
-        setHasGeneratedBefore(false);
-      }
-    };
-
-    void checkState();
-  }, [activeProjectId, supabaseClient]);
-
-  // Poll for pending jobs if isGeneratingAdvice is true
-  useEffect(() => {
-    if (!isGeneratingAdvice || !activeProjectId || !supabaseClient) return;
-
-    const pollInterval = setInterval(async () => {
-      const { data: pendingJobs } = await supabaseClient
-        .from('analysis_jobs')
-        .select('id')
-        .eq('project_id', activeProjectId)
-        .eq('job_type', 'ai_advice')
-        .eq('status', 'pending')
-        .limit(1);
-
-      if (!pendingJobs || pendingJobs.length === 0) {
-        // Job finished (or failed)
-        setIsGeneratingAdvice(false);
-        clearInterval(pollInterval);
-        refresh(); // Refresh to get new suggestions
-        setStatusMessage({ type: 'success', message: 'Analysis completed!' });
-        setTimeout(() => setStatusMessage(null), 3000);
-      }
-    }, 3000);
-
-    return () => clearInterval(pollInterval);
-  }, [isGeneratingAdvice, activeProjectId, supabaseClient, refresh]);
-
-  // Also update hasGeneratedBefore when suggestions are loaded
-  useEffect(() => {
-    if (suggestions.length > 0) {
-      setHasGeneratedBefore(true);
-    }
-  }, [suggestions.length]);
-
-  useEffect(() => {
-    if (remoteTables.length > 0) {
-      setIsConnected(true);
-    }
-  }, [remoteTables]);
-
-  useEffect(() => {
-    if (user && !isConnected) {
-      setIsConnected(true);
-    }
-  }, [user, isConnected]);
 
   // Auto-show ConnectProjectDialog for first-time users (onboarding)
   useEffect(() => {
@@ -178,8 +90,6 @@ export default function Home() {
 
   const handleSignOut = useCallback(async () => {
     await supabaseClient.auth.signOut();
-    setIsConnected(false);
-    setAdviceError(undefined);
   }, [supabaseClient]);
 
   const handleSync = useCallback(async () => {
@@ -208,62 +118,10 @@ export default function Home() {
       setTimeout(() => setStatusMessage(null), 3000);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to sync schema.';
-      setAdviceError(errorMsg);
       setStatusMessage({ type: 'error', message: errorMsg });
       setTimeout(() => setStatusMessage(null), 5000);
     }
-  }, [activeProjectId, refresh]);
-
-  const handleGenerateAdvice = useCallback(async () => {
-    if (!activeProjectId) {
-      setAdviceError('Select a project before generating advice.');
-      return;
-    }
-
-    setIsGeneratingAdvice(true);
-    setAdviceError(undefined);
-    setStatusMessage({ type: 'loading', message: 'GPT-5 analyzing your schema...' });
-
-    try {
-      const response = await fetch('/api/internal/advice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: activeProjectId }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? response.statusText);
-      }
-
-      const result = await response.json();
-
-      // If the API returns immediately (async mode) or after completion:
-      if (result.status === 'completed') {
-         await refresh();
-         setHasGeneratedBefore(true);
-         setShowSuggestions(true);
-         setStatusMessage({ 
-           type: 'success', 
-           message: `Generated ${result.result?.newSuggestions || 0} optimization suggestions!` 
-         });
-         setTimeout(() => setStatusMessage(null), 4000);
-         setIsGeneratingAdvice(false);
-      }
-      // If it returns 'pending', polling takes over (via the effect we added).
-
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to run AI advice.';
-      setAdviceError(errorMsg);
-      setStatusMessage({ type: 'error', message: errorMsg });
-      setTimeout(() => setStatusMessage(null), 5000);
-      setIsGeneratingAdvice(false);
-    }
-  }, [activeProjectId, refresh]);
-
-  // Note: ConnectProjectDialog handles initial sync + AI advice for new projects
-  // These effects are for manual operations only (user clicks Refresh/Run AI Advice)
-
+  }, [activeProjectId, refresh, setStatusMessage]);
 
   // Table navigation handlers
   const { selectTable, selectNextTable, clearSelection } = useTableNavigation(
@@ -277,7 +135,7 @@ export default function Home() {
     setShowSuggestions(prev => !prev);
   }, []);
 
-  // Keyboard shortcuts (enhanced)
+  // Keyboard shortcuts
   useKeyboardShortcuts(
     {
       onCommandK: () => setShowCommandPalette(true),
@@ -295,53 +153,14 @@ export default function Home() {
 
   const selectedTableData = tables.find(t => t.id === selectedTable);
 
-  const [isProcessingCallback, setIsProcessingCallback] = useState(false);
-
-  // Handle OAuth callback codes that land on homepage (redirect to proper callback)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    
-    if (code) {
-      // OAuth code landed on homepage - redirect to proper callback
-      setIsProcessingCallback(true);
-      const next = urlParams.get('next') || '/';
-      
-      // Use replace to avoid adding to history stack
-      window.location.replace(`/auth/callback?code=${code}&next=${encodeURIComponent(next)}`);
-      return;
-    }
-  }, []);
-
-  // Redirect to login if not connected
-  useEffect(() => {
-    // Ignore if we are handling an OAuth callback
-    if (isProcessingCallback) return;
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('code')) return;
-    }
-
-    if (!authLoading && !user && !isConnected) {
-      router.push('/login');
-    }
-  }, [authLoading, user, isConnected, router, isProcessingCallback]);
-
-    // Show loading state while checking auth or processing callback
-    if (authLoading || isProcessingCallback || (!user && !isConnected)) {
-      return (
-        <div className="h-screen w-screen flex items-center justify-center bg-[#0f0f0f]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-gray-400">
-              {isProcessingCallback ? 'Finalizing login...' : 'Loading...'}
-            </p>
-          </div>
-        </div>
-      );
-    }
-
+  // Show loading state while checking auth or processing callback
+  if (authLoading || isProcessingCallback || !user) {
+    return (
+      <LoadingScreen 
+        message={isProcessingCallback ? 'Finalizing login...' : 'Loading...'} 
+      />
+    );
+  }
     
   return (
     <div className="h-screen w-screen flex flex-col bg-[#0f0f0f]">

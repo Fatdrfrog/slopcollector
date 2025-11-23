@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
-import type { SuggestionStatus, OptimizationSuggestion } from '@/lib/supabase/suggestions';
+'use client';
+
+import { useSuggestionAction, useBulkSuggestionAction } from './mutations/useSuggestionMutations';
+import { useSuggestionsQuery } from './queries/useSuggestionsQuery';
+import type { SuggestionStatus } from '@/lib/supabase/suggestions';
 
 interface UseSuggestionsOptions {
   projectId: string;
   status?: SuggestionStatus;
-  autoFetch?: boolean;
 }
 
 interface SuggestionStats {
@@ -16,296 +18,81 @@ interface SuggestionStats {
 }
 
 /**
- * React hook for managing optimization suggestions
+ * Hook for managing optimization suggestions
+ * Now uses mutation hooks - DRY and consistent!
  * 
  * Usage:
  * ```tsx
- * const { suggestions, stats, loading, error, apply, dismiss } = useSuggestions({
+ * const { suggestions, loading, apply, dismiss } = useSuggestions({
  *   projectId: 'xxx',
  *   status: 'pending',
  * });
  * ```
  */
 export function useSuggestions(options: UseSuggestionsOptions) {
-  const { projectId, status, autoFetch = true } = options;
-  
-  const [suggestions, setSuggestions] = useState<OptimizationSuggestion[]>([]);
-  const [stats, setStats] = useState<SuggestionStats | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { projectId } = options;
 
-  // Fetch suggestions
-  const fetchSuggestions = async () => {
-    if (!projectId) return;
+  // Use the query hook for fetching
+  const {
+    data: suggestions = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useSuggestionsQuery(projectId);
 
-    setLoading(true);
-    setError(null);
+  // Use mutation hooks for actions (automatic cache invalidation!)
+  const applySingle = useSuggestionAction(projectId);
+  const dismissSingle = useSuggestionAction(projectId);
+  const archiveSingle = useSuggestionAction(projectId);
+  const applyBulk = useBulkSuggestionAction(projectId);
+  const dismissBulk = useBulkSuggestionAction(projectId);
 
-    try {
-      const params = new URLSearchParams({ projectId });
-      if (status) params.append('status', status);
-
-      const response = await fetch(`/api/internal/suggestions?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch suggestions: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setSuggestions(data.suggestions || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
+  // Compute stats from suggestions
+  const stats: SuggestionStats = {
+    total: suggestions.length,
+    pending: suggestions.filter((s: any) => s.severity === 'pending').length,
+    applied: suggestions.filter((s: any) => s.severity === 'applied').length,
+    dismissed: suggestions.filter((s: any) => s.severity === 'dismissed').length,
+    bySeverity: suggestions.reduce((acc: Record<string, number>, s: any) => {
+      acc[s.severity] = (acc[s.severity] || 0) + 1;
+      return acc;
+    }, {}),
   };
-
-  // Fetch stats
-  const fetchStats = async () => {
-    if (!projectId) return;
-
-    try {
-      const params = new URLSearchParams({ projectId, stats: 'true' });
-      const response = await fetch(`/api/internal/suggestions?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch stats: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setStats(data.stats || null);
-    } catch (err) {
-      console.error('Failed to fetch suggestion stats:', err);
-    }
-  };
-
-  // Apply a single suggestion
-  const apply = async (suggestionId: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/internal/suggestions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suggestionId,
-          action: 'apply',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to apply suggestion: ${response.statusText}`);
-      }
-
-      // Refresh suggestions and stats
-      await Promise.all([fetchSuggestions(), fetchStats()]);
-      
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Dismiss a single suggestion
-  const dismiss = async (suggestionId: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/internal/suggestions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suggestionId,
-          action: 'dismiss',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to dismiss suggestion: ${response.statusText}`);
-      }
-
-      // Refresh suggestions and stats
-      await Promise.all([fetchSuggestions(), fetchStats()]);
-      
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Archive a single suggestion
-  const archive = async (suggestionId: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/internal/suggestions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suggestionId,
-          action: 'archive',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to archive suggestion: ${response.statusText}`);
-      }
-
-      // Refresh suggestions and stats
-      await Promise.all([fetchSuggestions(), fetchStats()]);
-      
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Bulk apply suggestions
-  const bulkApply = async (suggestionIds: string[]) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/internal/suggestions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suggestionIds,
-          action: 'apply',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to apply suggestions: ${response.statusText}`);
-      }
-
-      // Refresh suggestions and stats
-      await Promise.all([fetchSuggestions(), fetchStats()]);
-      
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Bulk dismiss suggestions
-  const bulkDismiss = async (suggestionIds: string[]) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/internal/suggestions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suggestionIds,
-          action: 'dismiss',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to dismiss suggestions: ${response.statusText}`);
-      }
-
-      // Refresh suggestions and stats
-      await Promise.all([fetchSuggestions(), fetchStats()]);
-      
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Auto-fetch on mount or when dependencies change
-  useEffect(() => {
-    if (autoFetch && projectId) {
-      void Promise.all([fetchSuggestions(), fetchStats()]);
-    }
-  }, [projectId, status, autoFetch]);
 
   return {
     suggestions,
     stats,
-    loading,
-    error,
-    // Actions
-    apply,
-    dismiss,
-    archive,
-    bulkApply,
-    bulkDismiss,
+    loading: loading || applySingle.isPending || dismissSingle.isPending,
+    error: error?.message || applySingle.error?.message || dismissSingle.error?.message,
+
+    // Actions - now using mutations!
+    apply: (suggestionId: string) => 
+      applySingle.mutateAsync({ suggestionId, action: 'apply' }),
+    dismiss: (suggestionId: string) => 
+      dismissSingle.mutateAsync({ suggestionId, action: 'dismiss' }),
+    archive: (suggestionId: string) => 
+      archiveSingle.mutateAsync({ suggestionId, action: 'archive' }),
+    bulkApply: (suggestionIds: string[]) => 
+      applyBulk.mutateAsync({ suggestionIds, action: 'apply' }),
+    bulkDismiss: (suggestionIds: string[]) => 
+      dismissBulk.mutateAsync({ suggestionIds, action: 'dismiss' }),
+
     // Manual refresh
-    refresh: fetchSuggestions,
-    refreshStats: fetchStats,
+    refresh: refetch,
   };
 }
 
 /**
- * Hook for suggestion statistics only
- * Lighter weight if you only need counts
+ * Lightweight hook for suggestion statistics only
  */
 export function useSuggestionStats(projectId: string) {
-  const [stats, setStats] = useState<SuggestionStats | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchStats = async () => {
-    if (!projectId) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams({ projectId, stats: 'true' });
-      const response = await fetch(`/api/internal/suggestions?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch stats: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setStats(data.stats || null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (projectId) {
-      void fetchStats();
-    }
-  }, [projectId]);
-
+  const { stats, loading, error } = useSuggestions({ projectId });
+  
   return {
     stats,
     loading,
     error,
-    refresh: fetchStats,
   };
 }
+
 

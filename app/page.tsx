@@ -71,7 +71,7 @@ export default function Home() {
   // Check if suggestions have been generated before for this project
   // This helps show the correct UI state (e.g., "No Active Suggestions" vs "Ready for AI Analysis")
   useEffect(() => {
-    const checkHasGeneratedBefore = async () => {
+    const checkState = async () => {
       if (!activeProjectId || !supabaseClient) {
         setHasGeneratedBefore(false);
         return;
@@ -79,7 +79,7 @@ export default function Home() {
 
       try {
         // Check if there are any suggestions or analysis jobs for this project
-        const [suggestionsResult, jobsResult] = await Promise.all([
+        const [suggestionsResult, completedJobsResult, pendingJobsResult] = await Promise.all([
           supabaseClient
             .from('optimization_suggestions')
             .select('id', { count: 'exact', head: true })
@@ -92,19 +92,59 @@ export default function Home() {
             .eq('job_type', 'ai_advice')
             .eq('status', 'completed')
             .limit(1),
+          supabaseClient
+            .from('analysis_jobs')
+            .select('id', { count: 'exact', head: true })
+            .eq('project_id', activeProjectId)
+            .eq('job_type', 'ai_advice')
+            .eq('status', 'pending')
+            .limit(1),
         ]);
 
         const hasSuggestions = (suggestionsResult.count ?? 0) > 0;
-        const hasCompletedJobs = (jobsResult.count ?? 0) > 0;
+        const hasCompletedJobs = (completedJobsResult.count ?? 0) > 0;
+        const hasPendingJobs = (pendingJobsResult.count ?? 0) > 0;
+
         setHasGeneratedBefore(hasSuggestions || hasCompletedJobs);
+        
+        if (hasPendingJobs) {
+          setIsGeneratingAdvice(true);
+          setStatusMessage({ type: 'loading', message: 'AI analysis in progress...' });
+        }
       } catch (err) {
-        console.error('Error checking if suggestions exist:', err);
+        console.error('Error checking project state:', err);
         setHasGeneratedBefore(false);
       }
     };
 
-    void checkHasGeneratedBefore();
+    void checkState();
   }, [activeProjectId, supabaseClient]);
+
+  // Poll for pending jobs if isGeneratingAdvice is true
+  useEffect(() => {
+    if (!isGeneratingAdvice || !activeProjectId || !supabaseClient) return;
+
+    const pollInterval = setInterval(async () => {
+      const { data: pendingJobs } = await supabaseClient
+        .from('analysis_jobs')
+        .select('id')
+        .eq('project_id', activeProjectId)
+        .eq('job_type', 'ai_advice')
+        .eq('status', 'pending')
+        .limit(1);
+
+      if (!pendingJobs || pendingJobs.length === 0) {
+        // Job finished (or failed)
+        setIsGeneratingAdvice(false);
+        clearInterval(pollInterval);
+        refresh(); // Refresh to get new suggestions
+        setStatusMessage({ type: 'success', message: 'Analysis completed!' });
+        setTimeout(() => setStatusMessage(null), 3000);
+      }
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [isGeneratingAdvice, activeProjectId, supabaseClient, refresh]);
 
   // Also update hasGeneratedBefore when suggestions are loaded
   useEffect(() => {
@@ -198,27 +238,25 @@ export default function Home() {
 
       const result = await response.json();
 
-      // Refresh to get the new suggestions AND updated schema
-      // This ensures table issue coloring updates after advice generation
-      await refresh();
-      
-      // Mark that suggestions have been generated
-      setHasGeneratedBefore(true);
-      
-      // Show suggestions panel if hidden
-      setShowSuggestions(true);
-      
-      setStatusMessage({ 
-        type: 'success', 
-        message: `Generated ${result.result?.newSuggestions || 0} optimization suggestions!` 
-      });
-      setTimeout(() => setStatusMessage(null), 4000);
+      // If the API returns immediately (async mode) or after completion:
+      if (result.status === 'completed') {
+         await refresh();
+         setHasGeneratedBefore(true);
+         setShowSuggestions(true);
+         setStatusMessage({ 
+           type: 'success', 
+           message: `Generated ${result.result?.newSuggestions || 0} optimization suggestions!` 
+         });
+         setTimeout(() => setStatusMessage(null), 4000);
+         setIsGeneratingAdvice(false);
+      }
+      // If it returns 'pending', polling takes over (via the effect we added).
+
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to run AI advice.';
       setAdviceError(errorMsg);
       setStatusMessage({ type: 'error', message: errorMsg });
       setTimeout(() => setStatusMessage(null), 5000);
-    } finally {
       setIsGeneratingAdvice(false);
     }
   }, [activeProjectId, refresh]);
@@ -357,7 +395,7 @@ export default function Home() {
             <ResizableHandle withHandle />
 
             {showSuggestions && (
-              <ResizablePanel defaultSize={25}>
+              <ResizablePanel defaultSize={30} minSize={25}>
               <motion.div
                 initial={{ x: 420, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}

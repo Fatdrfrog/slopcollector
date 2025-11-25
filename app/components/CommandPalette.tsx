@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Search, Database, X } from 'lucide-react';
-import type { Table } from '../types';
+import type { Table } from '@/lib/types';
 
 interface CommandPaletteProps {
   tables: Table[];

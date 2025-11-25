@@ -1,34 +1,10 @@
 import { useMemo, useCallback, useState } from 'react';
 import type { Table, Suggestion } from '@/lib/types';
-import { generateNodesFromTables } from '../utils/nodeGenerator';
-import { generateEdgesFromTables } from '../utils/edgeGenerator';
-import { getLayoutedElements } from '../utils/layoutGraph';
-import { GraphCache } from '../utils/graphCache';
+import { generateNodesFromTables } from '@/app/utils/nodeGenerator';
+import { generateEdgesFromTables } from '@/app/utils/edgeGenerator';
+import { getLayoutedElements } from '@/app/utils/layoutGraph';
+import { GraphCache } from '@/app/utils/graphCache';
 
-/**
- * Custom hook for managing graph layout with optimized caching
- * Encapsulates all layout logic and provides a clean API for components
- * 
- * Features:
- * - Automatic memoization of expensive layout calculations
- * - Integration with singleton cache for cross-render optimization
- * - Separation of layout updates from selection updates
- * - Manual relayout function for user-triggered updates
- * 
- * @param tables - Array of tables to visualize
- * @param suggestions - AI suggestions for highlighting issues
- * @returns Graph state and control functions
- * 
- * @example
- * function MyComponent({ tables, suggestions }) {
- *   const { nodes, edges, relayout } = useGraphLayout(tables, suggestions);
- *   
- *   return (
- *     <ReactFlow nodes={nodes} edges={edges} />
- *     <button onClick={relayout}>Relayout</button>
- *   );
- * }
- */
 export function useGraphLayout(
   tables: Table[],
   suggestions: Suggestion[] = []

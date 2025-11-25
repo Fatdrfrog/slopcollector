@@ -1,19 +1,19 @@
 import { memo, useState } from 'react';
 import { Database, RefreshCcw, Github, Plus, Layout, Command, LogOut, User, Sparkles } from 'lucide-react';
-import type { ProjectSummary } from '../hooks/useProjects';
-import { GitHubConnectDialog } from './GitHubConnectDialog';
-import { GitHubRepoPicker } from './GitHubRepoPicker';
-import { ConnectProjectDialog } from './ConnectProjectDialog';
+import type { ProjectSummary } from '@/hooks/queries/useProjects';
+import { GitHubConnectDialog } from '@/app/components/GitHubConnectDialog';
+import { GitHubRepoPicker } from '@/app/components/GitHubRepoPicker';
+import { ConnectProjectDialog } from '@/app/components/ConnectProjectDialog';
 import { AnimatePresence } from 'motion/react';
-import { useSupabaseSession } from '../hooks/useSupabaseSession';
-import { Button } from '@/components/ui/button';
+import { useSupabaseSession } from '@/hooks/auth/useSupabaseSession';
+import { Button } from '@/app/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from '@/app/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +21,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from '@/app/components/ui/dropdown-menu';
 
 interface HeaderProps {
   tableCount: number;

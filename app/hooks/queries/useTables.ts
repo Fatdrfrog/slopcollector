@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/constants/query-keys';
 import { useSupabaseClient } from '@/lib/auth/hooks';
-import type { DatabaseSchemaSnapshot, TableSchema, IndexSchema } from '@/lib/supabase/introspect';
-import type { Table } from '@/app/types';
+import type { DatabaseSchemaSnapshot, TableSchema, IndexSchema, ColumnSchema } from '@/lib/types';
+import type { Table } from '@/lib/types';
 import { logger } from '@/lib/utils/logger';
 
 interface SchemaSnapshotRow {
@@ -112,7 +112,7 @@ export function useTables(projectId?: string) {
 
       const schema: DatabaseSchemaSnapshot = {
         tables: (snapshot.tables_data as TableSchema[]) || [],
-        columns: (snapshot.columns_data as any[]) || [],
+        columns: (snapshot.columns_data as ColumnSchema[]) || [],
         indexes: (snapshot.indexes_data as IndexSchema[]) || [],
       };
 

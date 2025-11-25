@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import { Toaster } from "@/app/components/ui/sonner";
-import { ErrorBoundary } from './components/ErrorBoundary';
+import { ErrorBoundary } from '@/app/components/ErrorBoundary';
 import { Providers } from './providers';
 import "./globals.css";
 

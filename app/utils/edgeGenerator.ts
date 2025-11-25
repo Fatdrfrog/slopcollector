@@ -1,5 +1,5 @@
 import type { Edge } from '@xyflow/react';
-import type { Table } from '../types';
+import type { Table } from '@/lib/types';
 import type { HandlePositions, Position } from './graphTypes';
 import { needsIndex } from './tableAnalysis';
 import { GraphCache } from './graphCache';

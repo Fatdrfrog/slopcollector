@@ -127,11 +127,9 @@ function LoginPageContent() {
       if (data.user) {
         // Check if email confirmation is required
         if (data.user.identities && data.user.identities.length === 0) {
-          // User already exists
           setError('An account with this email already exists. Please sign in instead.');
           setActiveTab('signin');
         } else {
-          // Success - show email sent message
           setEmailSent(true);
           authToasts.emailSent();
         }

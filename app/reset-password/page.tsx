@@ -121,7 +121,6 @@ export default function ResetPasswordPage() {
     }
   };
 
-  // Show success message after reset complete
   if (resetComplete) {
     return (
       <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4">
@@ -147,7 +146,6 @@ export default function ResetPasswordPage() {
     );
   }
 
-  // Show email sent confirmation
   if (emailSent && !isRecovery) {
     return (
       <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4">

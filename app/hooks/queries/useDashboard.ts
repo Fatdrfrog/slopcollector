@@ -2,7 +2,7 @@
 
 import { useTables } from './useTables';
 import { useSuggestionsQuery } from './useSuggestionsQuery';
-import type { Table, Suggestion } from '@/app/types';
+import type { Table, Suggestion } from '@/lib/types';
 
 interface UseDashboardResult {
   tables: Table[];

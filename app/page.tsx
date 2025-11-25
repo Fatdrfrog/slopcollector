@@ -1,126 +1,31 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Header } from './components/Header';
-import { ERDCanvas } from './components/ERDCanvas';
-import { SuggestionsPanel } from './components/SuggestionsPanel';
-import { CommandPalette } from './components/CommandPalette';
-import { EmptyState } from './components/EmptyState';
-import { StatusIndicator } from './components/StatusIndicator';
-import { DebugPanel } from './components/DebugPanel';
-import { NoSuggestionsPrompt } from './components/NoSuggestionsPrompt';
-import { ConnectProjectDialog } from './components/ConnectProjectDialog';
-import { LoadingScreen } from './components/LoadingScreen';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { useTableNavigation } from './hooks/useTableNavigation';
-import { useDashboard } from '@/app/hooks/queries';
-import { useProjects } from './hooks/useProjects';
-import { useSupabaseSession } from './hooks/useSupabaseSession';
-import { useSupabaseClient } from '@/lib/auth/hooks';
-import { useAdviceGeneration } from './hooks/useAdviceGeneration';
-import { useProjectState } from './hooks/useProjectState';
-import { useAuthRedirect } from './hooks/useAuthRedirect';
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable"
+import { useCallback } from 'react';
+
+import { DashboardLayout } from '@/app/components/dashboard';
+import { LoadingScreen } from '@/app/components/LoadingScreen';
+import { useDashboardState } from '@/hooks/features/useDashboardState';
+import { useKeyboardShortcuts } from '@/hooks/ui/useKeyboardShortcuts';
 
 export default function Home() {
-  const {
-    projects,
-    activeProjectId,
-    setActiveProjectId,
-    loading: projectsLoading,
-    error: projectsError,
-  } = useProjects();
-  const {
-    tables,
-    suggestions,
-    loading,
-    error,
-    refresh,
-  } = useDashboard(activeProjectId);
-  const { user, loading: authLoading } = useSupabaseSession();
-  const supabaseClient = useSupabaseClient();
-
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(true);
-  const [showConnectDialog, setShowConnectDialog] = useState(false);
-
-  const { hasGeneratedBefore, setHasGeneratedBefore } = useProjectState(
-    activeProjectId,
-    suggestions.length
-  );
+  const state = useDashboardState();
 
   const {
-    isGeneratingAdvice,
-    adviceError,
-    statusMessage,
-    setStatusMessage,
+    authLoading,
+    isProcessingCallback,
+    user,
+    showCommandPalette,
+    setShowCommandPalette,
+    selectTable,
+    selectNextTable,
+    clearSelection,
+    toggleSuggestions,
+    handleSync,
     handleGenerateAdvice,
-  } = useAdviceGeneration(activeProjectId, refresh, setHasGeneratedBefore, setShowSuggestions);
-
-  const { isProcessingCallback } = useAuthRedirect(user, authLoading);
-
-  const handleTableSelect = useCallback((tableId: string | null) => {
-    setSelectedTable(tableId);
-  }, []);
-
-  useEffect(() => {
-    if (!projectsLoading && !authLoading && user && projects.length === 0) {
-      const timer = setTimeout(() => {
-        setShowConnectDialog(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [projectsLoading, authLoading, user, projects.length]);
-
-  const handleSignOut = useCallback(async () => {
-    await supabaseClient.auth.signOut();
-  }, [supabaseClient]);
-
-  const handleSync = useCallback(async () => {
-    if (!activeProjectId) {
-      return;
-    }
-
-    setStatusMessage({ type: 'loading', message: 'Syncing schema from Supabase...' });
-
-    try {
-      const response = await fetch('/api/internal/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: activeProjectId }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? response.statusText);
-      }
-
-      await refresh();
-      
-      setStatusMessage({ type: 'success', message: 'Schema synced successfully!' });
-      setTimeout(() => setStatusMessage(null), 3000);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to sync schema.';
-      setStatusMessage({ type: 'error', message: errorMsg });
-      setTimeout(() => setStatusMessage(null), 5000);
-    }
-  }, [activeProjectId, refresh, setStatusMessage]);
-
-  const { selectTable, selectNextTable, clearSelection } = useTableNavigation(
-    tables,
-    selectedTable,
-    setSelectedTable
-  );
-
-  const toggleSuggestions = useCallback(() => {
-    setShowSuggestions(prev => !prev);
-  }, []);
+    statusMessage,
+    handleDismissStatus,
+    refresh,
+  } = state;
 
   useKeyboardShortcuts(
     {
@@ -134,10 +39,18 @@ export default function Home() {
       onCommandR: handleSync,
       onCommandG: handleGenerateAdvice,
     },
-    [selectNextTable, clearSelection, toggleSuggestions, handleSync, handleGenerateAdvice]
+    [selectNextTable, clearSelection, toggleSuggestions, handleSync, handleGenerateAdvice, setShowCommandPalette]
   );
 
-  const selectedTableData = tables.find(t => t.id === selectedTable);
+  const handleSelectTableFromPalette = useCallback((id: string) => {
+    selectTable(id);
+    setShowCommandPalette(false);
+  }, [selectTable, setShowCommandPalette]);
+
+
+  const handleConnectSuccess = useCallback(() => {
+    refresh();
+  }, [refresh]);
 
   if (authLoading || isProcessingCallback || !user) {
     return (
@@ -146,122 +59,40 @@ export default function Home() {
       />
     );
   }
-    
+
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#0f0f0f]">
-      <Header
-        tableCount={tables.length}
-        showSuggestions={showSuggestions}
-        onToggleSuggestions={() => setShowSuggestions(!showSuggestions)}
-        onOpenCommandPalette={() => setShowCommandPalette(true)}
-        projects={projects}
-        activeProjectId={activeProjectId}
-        onProjectChange={(projectId) => setActiveProjectId(projectId)}
-        onRefresh={handleSync}
-        isSyncing={loading}
-        userEmail={user?.email}
-        onSignOut={handleSignOut}
-        onGenerateAdvice={handleGenerateAdvice}
-        isGeneratingAdvice={isGeneratingAdvice}
-      />
-
-      {(projectsError || error || adviceError) && (
-        <div className="bg-red-900/40 text-red-200 text-sm px-4 py-2 border-b border-red-900">
-          {projectsError ?? error ?? adviceError}
-        </div>
-      )}
-
-      {(authLoading || projectsLoading || loading) && (
-        <div className="bg-indigo-900/30 text-indigo-200 text-sm px-4 py-2 border-b border-indigo-800">
-          {authLoading
-            ? 'Checking authentication…'
-            : projectsLoading
-            ? 'Loading Supabase projects…'
-            : 'Syncing your database schema from Supabase…'}
-        </div>
-      )}
-
-      <ResizablePanelGroup direction="horizontal" className="flex-1 flex">
-        {tables.length === 0 ? (
-          <EmptyState onSync={handleSync} isSyncing={loading} />
-        ) : (
-          <>
-            <ResizablePanel defaultSize={75}>
-              <ERDCanvas
-                tables={tables}
-                selectedTable={selectedTable}
-                onTableSelect={handleTableSelect}
-                suggestions={suggestions}
-              />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-
-            {showSuggestions && (
-              <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                <motion.div
-                  initial={{ x: 420, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 420, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: 'easeInOut' }}
-                  className="h-full"
-                >
-                  {suggestions.length === 0 && !loading ? (
-                    <NoSuggestionsPrompt
-                      onGenerateAdvice={handleGenerateAdvice}
-                      isGenerating={isGeneratingAdvice}
-                      hasGeneratedBefore={hasGeneratedBefore}
-                    />
-                  ) : (
-                    <SuggestionsPanel
-                      suggestions={suggestions}
-                      selectedTable={selectedTableData}
-                      onSelectTable={handleTableSelect}
-                      isLoading={loading}
-                    />
-                  )}
-                </motion.div>
-              </ResizablePanel>
-            )}
-          </>
-        )}
-      </ResizablePanelGroup>
-
-      {showCommandPalette && (
-        <CommandPalette
-          tables={tables}
-          onClose={() => setShowCommandPalette(false)}
-          onSelectTable={(id) => {
-            selectTable(id);
-            setShowCommandPalette(false);
-          }}
-        />
-      )}
-
-      <AnimatePresence>
-        {statusMessage && (
-          <StatusIndicator
-            type={statusMessage.type}
-            message={statusMessage.message}
-            onDismiss={() => setStatusMessage(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      <DebugPanel
-        activeProjectId={activeProjectId}
-        projectsCount={projects.length}
-        suggestionsCount={suggestions.length}
-        tablesCount={tables.length}
-        userId={user?.id}
-      />
-
-      <ConnectProjectDialog
-        open={showConnectDialog}
-        onOpenChange={setShowConnectDialog}
-        onSuccess={() => {
-          refresh();
-        }}
-      />
-    </div>
+    <DashboardLayout
+      projects={state.projects}
+      activeProjectId={state.activeProjectId}
+      setActiveProjectId={state.setActiveProjectId}
+      projectsLoading={state.projectsLoading}
+      projectsError={state.projectsError}
+      tables={state.tables}
+      suggestions={state.suggestions}
+      loading={state.loading}
+      error={state.error}
+      selectedTable={state.selectedTable}
+      selectedTableData={state.selectedTableData}
+      showCommandPalette={showCommandPalette}
+      showSuggestions={state.showSuggestions}
+      showConnectDialog={state.showConnectDialog}
+      hasGeneratedBefore={state.hasGeneratedBefore}
+      isGeneratingAdvice={state.isGeneratingAdvice}
+      adviceError={state.adviceError}
+      statusMessage={statusMessage}
+      userEmail={user?.email}
+      userId={user?.id}
+      onTableSelect={state.handleTableSelect}
+      onToggleSuggestions={toggleSuggestions}
+      onOpenCommandPalette={() => setShowCommandPalette(true)}
+      onCloseCommandPalette={() => setShowCommandPalette(false)}
+      onSelectTableFromPalette={handleSelectTableFromPalette}
+      onRefresh={handleSync}
+      onSignOut={state.handleSignOut}
+      onGenerateAdvice={handleGenerateAdvice}
+      onConnectDialogChange={state.setShowConnectDialog}
+      onConnectSuccess={handleConnectSuccess}
+      onDismissStatus={handleDismissStatus}
+    />
   );
 }

@@ -16,7 +16,6 @@ export async function PATCH(
   try {
     const supabase = await getServerClient();
     
-    // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json(
@@ -34,7 +33,6 @@ export async function PATCH(
       );
     }
 
-    // Determine status updates based on action
     const now = new Date().toISOString();
     let updates: {
       status: string | null;
@@ -71,7 +69,6 @@ export async function PATCH(
         break;
     }
 
-    // Update the suggestion
     const { data: suggestion, error: updateError } = await supabase
       .from('optimization_suggestions')
       .update(updates)

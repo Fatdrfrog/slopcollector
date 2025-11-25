@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getServiceClient } from '@/lib/supabase/serviceClient';
+
+import type { DatabaseSchemaSnapshot, TableSchema, ColumnSchema, IndexSchema } from '@/lib/types';
 import { generateAIAdviceForProject, storeAdviceSuggestions } from '@/lib/ai/adviceService';
-import type { DatabaseSchemaSnapshot } from '@/lib/supabase/introspect';
+import { getServiceClient } from '@/lib/supabase/serviceClient';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -169,9 +170,9 @@ async function processProjectAdvice(
     });
 
     const schemaSnapshot: DatabaseSchemaSnapshot = {
-      tables: (snapshot.tables_data as any[]) || [],
-      columns: (snapshot.columns_data as any[]) || [],
-      indexes: (snapshot.indexes_data as any[]) || [],
+      tables: (snapshot.tables_data as TableSchema[]) || [],
+      columns: (snapshot.columns_data as ColumnSchema[]) || [],
+      indexes: (snapshot.indexes_data as IndexSchema[]) || [],
     };
 
     const storeResult = await storeAdviceSuggestions(

@@ -16,9 +16,9 @@ import {
 import { TableNode, type TableNodeData } from './TableNode';
 import { KeyboardHints } from './KeyboardHints';
 import { RelayoutButton } from './RelayoutButton';
-import type { Table, Suggestion } from '../types';
-import { useGraphLayout } from '../hooks/useGraphLayout';
-import { GRAPH_CONFIG } from '../utils/graphConfig';
+import type { Table, Suggestion } from '@/lib/types';
+import { useGraphLayout } from '@/hooks/ui/useGraphLayout';
+import { GRAPH_CONFIG } from '@/app/utils/graphConfig';
 
 interface ERDCanvasProps {
   tables: Table[];

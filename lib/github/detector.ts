@@ -11,16 +11,6 @@ export interface GitHubIntegration {
   organizationSlug?: string;
 }
 
-interface SupabaseIntegration {
-  id: string;
-  type: string;
-  metadata?: {
-    repository?: string;
-    owner?: string;
-    default_branch?: string;
-  };
-}
-
 /**
  * NOTE: Supabase GitHub integration is a Dashboard-only feature
  * There is no public API to detect it programmatically
@@ -30,10 +20,7 @@ interface SupabaseIntegration {
  * 
  * @deprecated - Use manual GitHub URL input instead
  */
-export async function detectGitHubIntegration(
-  projectRef: string,
-  serviceRoleKey: string
-): Promise<GitHubIntegration> {
+export async function detectGitHubIntegration(): Promise<GitHubIntegration> {
   // GitHub integration is not exposed via public API
   // Users need to manually provide their repository URL
   console.warn(
@@ -83,7 +70,7 @@ export function extractProjectRef(supabaseUrl: string): string | null {
     
     // Extract project ref from hostname (xxx.supabase.co)
     const match = hostname.match(/^([a-z0-9]+)\.supabase\.co$/);
-    if (match) {
+    if (match && match[1]) {
       return match[1];
     }
 
@@ -111,7 +98,7 @@ export function parseGitHubUrl(repoUrl: string): {
 
     for (const pattern of patterns) {
       const match = repoUrl.match(pattern);
-      if (match) {
+      if (match && match[1] && match[2]) {
         return {
           owner: match[1],
           repo: match[2].replace(/\.git$/, ''),

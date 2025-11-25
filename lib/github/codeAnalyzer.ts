@@ -231,48 +231,59 @@ function extractSupabaseColumns(
   // .eq('column', value)
   const eqMatches = line.matchAll(/\.eq\s*\(\s*['"`](\w+)['"`]/gi);
   for (const match of eqMatches) {
-    patterns.push({
-      tableName,
-      columnName: match[1],
-      patternType: 'filter',
-    });
+    const columnName = match[1];
+    if (columnName) {
+      patterns.push({
+        tableName,
+        columnName,
+        patternType: 'filter',
+      });
+    }
   }
 
   // .filter('column', 'operator', value)
   const filterMatches = line.matchAll(/\.filter\s*\(\s*['"`](\w+)['"`]/gi);
   for (const match of filterMatches) {
-    patterns.push({
-      tableName,
-      columnName: match[1],
-      patternType: 'filter',
-    });
+    const columnName = match[1];
+    if (columnName) {
+      patterns.push({
+        tableName,
+        columnName,
+        patternType: 'filter',
+      });
+    }
   }
 
   // .order('column')
   const orderMatches = line.matchAll(/\.order\s*\(\s*['"`](\w+)['"`]/gi);
   for (const match of orderMatches) {
-    patterns.push({
-      tableName,
-      columnName: match[1],
-      patternType: 'sort',
-    });
+    const columnName = match[1];
+    if (columnName) {
+      patterns.push({
+        tableName,
+        columnName,
+        patternType: 'sort',
+      });
+    }
   }
 
   // .select with specific columns
   const selectMatches = line.matchAll(/\.select\s*\(\s*['"`]([^'"`]+)['"`]/gi);
   for (const match of selectMatches) {
-    const columns = match[1].split(',').map(c => c.trim());
-    columns.forEach(col => {
-      // Extract column name (handle table.column notation)
-      const colName = col.includes('.') ? col.split('.').pop() : col;
-      if (colName && colName !== '*' && !/\(/.test(colName)) {
-        patterns.push({
-          tableName,
-          columnName: colName,
-          patternType: 'query',
-        });
-      }
-    });
+    const matchResult = match[1];
+    if (matchResult) {
+      const columns = matchResult.split(',').map(c => c.trim());
+      columns.forEach(col => {
+        const colName = col.includes('.') ? col.split('.').pop() : col;
+        if (colName && colName !== '*' && !/\(/.test(colName)) {
+          patterns.push({
+            tableName,
+            columnName: colName,
+            patternType: 'query',
+          });
+        }
+      });
+    }
   }
 
   return patterns;
@@ -290,31 +301,40 @@ function extractSQLColumns(
   // WHERE column = value
   const whereMatches = line.matchAll(/WHERE\s+(\w+)\s*[=<>!]/gi);
   for (const match of whereMatches) {
-    patterns.push({
-      tableName,
-      columnName: match[1],
-      patternType: 'filter',
-    });
+    const columnName = match[1];
+    if (columnName) {
+      patterns.push({
+        tableName,
+        columnName,
+        patternType: 'filter',
+      });
+    }
   }
 
   // ORDER BY column
   const orderMatches = line.matchAll(/ORDER\s+BY\s+(\w+)/gi);
   for (const match of orderMatches) {
-    patterns.push({
-      tableName,
-      columnName: match[1],
-      patternType: 'sort',
-    });
+    const columnName = match[1];
+    if (columnName) {
+      patterns.push({
+        tableName,
+        columnName,
+        patternType: 'sort',
+      });
+    }
   }
 
   // JOIN table ON column
   const joinMatches = line.matchAll(/JOIN\s+\w+\s+ON\s+\w+\.(\w+)/gi);
   for (const match of joinMatches) {
-    patterns.push({
-      tableName,
-      columnName: match[1],
-      patternType: 'join',
-    });
+    const columnName = match[1];
+    if (columnName) {
+      patterns.push({
+        tableName,
+        columnName,
+        patternType: 'join',
+      });
+    }
   }
 
   return patterns;

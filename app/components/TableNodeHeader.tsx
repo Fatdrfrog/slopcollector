@@ -1,6 +1,6 @@
 import { Table2, AlertCircle } from 'lucide-react';
-import type { Table } from '../types';
-import { formatRowCount } from '../utils/tableAnalysis';
+import type { Table } from '@/lib/types';
+import { formatRowCount } from '@/app/utils/tableAnalysis';
 
 interface TableNodeHeaderProps {
   table: Table;

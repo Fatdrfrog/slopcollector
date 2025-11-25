@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase/serviceClient';
 import { getServerClient } from '@/lib/supabase/server';
+import { createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse } from '@/lib/utils/api-errors';
+import { ColumnSchema, IndexSchema, TableSchema } from '@/lib/types';
 
 interface AdviceRequestBody {
   projectId?: string;
@@ -16,11 +18,11 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return createUnauthorizedResponse();
   }
 
   if (!body.projectId) {
-    return NextResponse.json({ error: 'Project ID required' }, { status: 400 });
+    return createBadRequestResponse('Project ID required');
   }
 
   let serviceClient;
@@ -46,10 +48,7 @@ export async function POST(request: Request) {
     .single();
 
   if (projectError || !project) {
-    return NextResponse.json(
-      { error: 'Project not found or access denied' },
-      { status: 404 }
-    );
+    return createNotFoundResponse('Project not found or access denied');
   }
 
   const { data: job, error: jobError } = await serviceClient
@@ -97,13 +96,13 @@ export async function POST(request: Request) {
       result.suggestions,
       {
         schemaSnapshot: {
-          tables: (snapshot.tables_data as any[]) || [],
-          columns: (snapshot.columns_data as any[]) || [],
-          indexes: (snapshot.indexes_data as any[]) || [],
+          tables: (snapshot.tables_data as TableSchema[]) || [],
+          columns: (snapshot.columns_data as ColumnSchema[]) || [],
+          indexes: (snapshot.indexes_data as IndexSchema[]) || [],
         },
       }
     );
-
+    
     await serviceClient
       .from('analysis_jobs')
       .update({

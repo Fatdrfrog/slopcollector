@@ -2,13 +2,12 @@ import { memo, type MouseEvent } from 'react';
 import { Handle, Position, NodeToolbar } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
 import { Copy, ExternalLink, Maximize2 } from 'lucide-react';
-import type { Table } from '../types';
-import { hasTableIssues, countCriticalIssues } from '../utils/tableAnalysis';
+import type { Table } from '@/lib/types';
+import { countCriticalIssues } from '@/app/utils/tableAnalysis';
 import { TableNodeHeader } from './TableNodeHeader';
 import { ColumnRow } from './ColumnRow';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { GRAPH_CONFIG } from '../utils/graphConfig';
 
 export interface TableNodeData extends Record<string, unknown> {
   table: Table;
@@ -22,10 +21,7 @@ type TableNodeRFNode = Node<TableNodeData>;
 
 type TableNodeProps = NodeProps<TableNodeRFNode>;
 
-/**
- * Custom comparison function for TableNode memo
- * Only re-render when data that affects visual output changes
- */
+
 function arePropsEqual(prev: TableNodeProps, next: TableNodeProps): boolean {
   return (
     prev.data.isSelected === next.data.isSelected &&
@@ -36,10 +32,7 @@ function arePropsEqual(prev: TableNodeProps, next: TableNodeProps): boolean {
   );
 }
 
-/**
- * Custom React Flow node representing a database table
- * Memoized to prevent unnecessary re-renders on parent updates
- */
+
 const TableNodeComponent = ({ data }: TableNodeProps) => {
   const { table, isSelected, onSelect, hasAIIssues, hasSchemaIssues } = data;
   const criticalIssues = countCriticalIssues(table);
@@ -62,7 +55,6 @@ const TableNodeComponent = ({ data }: TableNodeProps) => {
 
   return (
     <>
-      {/* NodeToolbar - appears when node is selected */}
       <NodeToolbar
         isVisible={isSelected}
         position={Position.Top}
@@ -110,7 +102,6 @@ const TableNodeComponent = ({ data }: TableNodeProps) => {
         style={{ minWidth: '320px' }}
         onClick={handleClick}
       >
-      {/* Gradient border effect for selected/issue states */}
       <div className={`absolute inset-0 rounded-xl bg-gradient-to-br opacity-0 transition-opacity duration-200 ${
         isSelected 
           ? `from-primary via-primary/50 to-primary opacity-10` 
@@ -121,7 +112,6 @@ const TableNodeComponent = ({ data }: TableNodeProps) => {
               : ''
       }`} />
 
-      {/* Connection handles for edges - bidirectional for smart routing */}
       <Handle 
         type="source" 
         position={Position.Left} 
@@ -175,14 +165,12 @@ const TableNodeComponent = ({ data }: TableNodeProps) => {
         style={{ opacity: 0 }}
       />
 
-      {/* Header */}
       <TableNodeHeader 
         table={table} 
         isSelected={isSelected} 
         criticalIssues={criticalIssues} 
       />
 
-      {/* Columns */}
       <div className="relative">
         {table.columns.map((column, index) => (
           <ColumnRow
@@ -197,9 +185,6 @@ const TableNodeComponent = ({ data }: TableNodeProps) => {
   );
 };
 
-/**
- * Export memoized version with custom comparison
- */
 export const TableNode = memo(TableNodeComponent, arePropsEqual);
 
 TableNode.displayName = 'TableNode';

@@ -1,38 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
+import type {
+  ColumnSchema,
+  TableSchema,
+  IndexSchema,
+  DatabaseSchemaSnapshot,
+} from '@/lib/types/database';
 
-
-export interface ColumnSchema {
-  schema: string;
-  tableName: string;
-  columnName: string;
-  dataType: string;
-  isNullable: boolean;
-  columnDefault: string | null;
-  isPrimaryKey?: boolean;
-  foreignKeyTo?: string; 
-}
-
-export interface TableSchema {
-  schema: string;
-  tableName: string;
-  rowEstimate: number | null;
-  description: string | null;
-}
-
-export interface IndexSchema {
-  schema: string;
-  tableName: string;
-  indexName: string;
-  isUnique: boolean;
-  isPrimary: boolean;
-  columns: string[];
-}
-
-export interface DatabaseSchemaSnapshot {
-  tables: TableSchema[];
-  columns: ColumnSchema[];
-  indexes: IndexSchema[];
-}
+export type {
+  ColumnSchema,
+  TableSchema,
+  IndexSchema,
+  DatabaseSchemaSnapshot,
+};
 
 export async function getSimpleTableList(
   supabaseUrl: string,
@@ -71,9 +50,8 @@ async function getRealForeignKeyConstraints(
   
   try {
     const client = createClient(supabaseUrl, supabaseKey);
-    
 
-    const { data, error } = await client
+    const { error } = await client
       .from('pg_catalog.pg_constraint')
       .select(`
         conname,

@@ -1,6 +1,6 @@
 import dagre from 'dagre';
 import type { Node, Edge } from '@xyflow/react';
-import type { TableNodeData } from '../components/TableNode';
+import type { TableNodeData } from '@/app/components/TableNode';
 import type { LayoutResult, LayoutDirection } from './graphTypes';
 import { GRAPH_CONFIG } from './graphConfig';
 

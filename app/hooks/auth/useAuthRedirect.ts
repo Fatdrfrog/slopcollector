@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { User } from '@supabase/supabase-js';
 
-export function useAuthRedirect(user: any, authLoading: boolean) {
+export function useAuthRedirect(user: User | null, authLoading: boolean) {
   const router = useRouter();
   const [isProcessingCallback, setIsProcessingCallback] = useState(false);
 

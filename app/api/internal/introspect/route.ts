@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerClient } from '@/lib/supabase/server';
 import { introspectSupabaseProject } from '@/lib/supabase/introspect';
 import { getServiceClient } from '@/lib/supabase/serviceClient';
+import { createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse, createInternalErrorResponse } from '@/lib/utils/api-errors';
 
 interface IntrospectRequestBody {
   projectId?: string;
@@ -14,10 +15,7 @@ export async function POST(request: Request) {
   const requestedSchema = body.schema ?? 'public';
 
   if (!projectId) {
-    return NextResponse.json(
-      { error: 'projectId is required' },
-      { status: 400 }
-    );
+    return createBadRequestResponse('projectId is required');
   }
 
   const supabase = await getServerClient();
@@ -26,7 +24,7 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return createUnauthorizedResponse();
   }
 
   const serviceClient = getServiceClient();
@@ -39,17 +37,11 @@ export async function POST(request: Request) {
     .single();
 
   if (projectError || !project) {
-    return NextResponse.json(
-      { error: 'Project not found or access denied' },
-      { status: 404 }
-    );
+    return createNotFoundResponse('Project not found or access denied');
   }
 
   if (!project.supabase_url || !project.supabase_anon_key) {
-    return NextResponse.json(
-      { error: 'Project credentials missing' },
-      { status: 400 }
-    );
+    return createBadRequestResponse('Project credentials missing');
   }
 
   try {
@@ -88,13 +80,7 @@ export async function POST(request: Request) {
       .single();
 
     if (insertError) {
-      return NextResponse.json(
-        {
-          error: 'Failed to save snapshot',
-          details: insertError.message,
-        },
-        { status: 500 }
-      );
+      return createInternalErrorResponse('Failed to save snapshot', insertError.message);
     }
 
     return NextResponse.json({
@@ -104,12 +90,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Introspection error', error);
-    return NextResponse.json(
-      {
-        error: 'Failed to introspect database',
-        details: error instanceof Error ? error.message : error,
-      },
-      { status: 500 }
+    return createInternalErrorResponse(
+      'Failed to introspect database',
+      error instanceof Error ? error.message : String(error)
     );
   }
 }

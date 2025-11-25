@@ -1,8 +1,8 @@
 import { memo, useMemo } from 'react';
 import { Info, TrendingUp, Loader2 } from 'lucide-react';
-import type { Suggestion, Table } from '../types';
-import { SuggestionCard } from './SuggestionCard';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import type { Suggestion, Table } from '@/lib/types';
+import { SuggestionCard } from '@/app/components/SuggestionCard';
+import { ScrollArea } from '@/app/components/ui/scroll-area';
 
 interface SuggestionsPanelProps {
   suggestions: Suggestion[];
@@ -12,10 +12,6 @@ interface SuggestionsPanelProps {
   onStatusChange?: (suggestionId: string, newStatus: 'pending' | 'applied' | 'dismissed') => void;
 }
 
-/**
- * Panel displaying database optimization suggestions
- * Optimized with React.memo and useMemo to prevent unnecessary re-renders
- */
 export const SuggestionsPanel = memo(function SuggestionsPanel({ 
   suggestions, 
   selectedTable, 
@@ -33,7 +29,7 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
       if (!acc[suggestion.severity]) {
         acc[suggestion.severity] = [];
       }
-      acc[suggestion.severity].push(suggestion);
+      acc[suggestion.severity || 'info']?.push(suggestion);
       return acc;
     }, {} as Record<string, Suggestion[]>);
   }, [filteredSuggestions]);
@@ -46,7 +42,6 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
 
   return (
     <div className="h-full border-l border-border bg-background flex flex-col overflow-hidden w-full">
-      {/* Header */}
       <div className="px-5 py-4 border-b border-border bg-card/60 backdrop-blur-sm shrink-0">
         <h2 className="text-foreground flex items-center gap-2.5">
           <div className="p-1.5 bg-primary/10 rounded-lg">
@@ -67,7 +62,6 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
         </p>
       </div>
 
-      {/* Suggestions List */}
       <ScrollArea className="flex-1">
         {isLoading ? (
           <LoadingState />
@@ -79,7 +73,7 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
               <SuggestionGroup
                 key={severity}
                 severity={severity}
-                suggestions={groupedSuggestions[severity]}
+                suggestions={groupedSuggestions[severity] || []}
                 onSelectTable={onSelectTable}
                 onStatusChange={onStatusChange}
               />
@@ -88,7 +82,6 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
         )}
       </ScrollArea>
 
-      {/* Summary Stats */}
       {filteredSuggestions.length > 0 && (
         <div className="shrink-0">
           <SummaryStats groupedSuggestions={groupedSuggestions} />

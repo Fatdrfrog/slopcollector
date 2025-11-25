@@ -1,5 +1,5 @@
 import type { Node, Edge } from '@xyflow/react';
-import type { TableNodeData } from '../components/TableNode';
+import type { TableNodeData } from '@/app/components/TableNode';
 
 /**
  * Type-safe cache key for graph operations

@@ -1,6 +1,6 @@
 import type { Node } from '@xyflow/react';
-import type { Table, Suggestion } from '../types';
-import type { TableNodeData } from '../components/TableNode';
+import type { Table, Suggestion } from '@/lib/types';
+import type { TableNodeData } from '@/app/components/TableNode';
 import { hasSchemaIssues, hasAISuggestions } from './tableAnalysis';
 import { GraphCache } from './graphCache';
 

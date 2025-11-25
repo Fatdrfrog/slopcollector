@@ -1,8 +1,8 @@
 'use client';
 
-import { useSuggestionAction, useBulkSuggestionAction } from './mutations/useSuggestionMutations';
-import { useSuggestionsQuery } from './queries/useSuggestionsQuery';
-import type { SuggestionStatus } from '@/lib/supabase/suggestions';
+import { useSuggestionAction, useBulkSuggestionAction } from '@/hooks/mutations/useSuggestionMutations';
+import { useSuggestionsQuery } from './useSuggestionsQuery';
+import type { SuggestionStatus } from '@/lib/types';
 
 interface UseSuggestionsOptions {
   projectId: string;
@@ -35,11 +35,12 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 
   const stats: SuggestionStats = {
     total: suggestions.length,
-    pending: suggestions.filter((s: any) => s.severity === 'pending').length,
-    applied: suggestions.filter((s: any) => s.severity === 'applied').length,
-    dismissed: suggestions.filter((s: any) => s.severity === 'dismissed').length,
-    bySeverity: suggestions.reduce((acc: Record<string, number>, s: any) => {
-      acc[s.severity] = (acc[s.severity] || 0) + 1;
+    pending: suggestions.filter((s) => s.status === 'pending').length,
+    applied: suggestions.filter((s) => s.status === 'applied').length,
+    dismissed: suggestions.filter((s) => s.status === 'dismissed').length,
+    bySeverity: suggestions.reduce((acc: Record<string, number>, s) => {
+      const severity = s.severity || 'info';
+      acc[severity] = (acc[severity] || 0) + 1;
       return acc;
     }, {}),
   };

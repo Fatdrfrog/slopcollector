@@ -1,6 +1,6 @@
 import { Key, Link } from 'lucide-react';
-import type { Column } from '../types';
-import { isColumnUnused, needsIndex } from '../utils/tableAnalysis';
+import type { Column } from '@/lib/types';
+import { isColumnUnused, needsIndex } from '@/app/utils/tableAnalysis';
 
 interface ColumnRowProps {
   column: Column;

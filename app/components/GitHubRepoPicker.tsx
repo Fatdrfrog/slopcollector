@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Github, CheckCircle, AlertCircle, Loader2, Code } from 'lucide-react';
-import { useSupabaseSession } from '@/app/hooks/useSupabaseSession';
+import { CheckCircle, AlertCircle, Loader2, Code } from 'lucide-react';
+import { useSupabaseSession } from '@/hooks/auth/useSupabaseSession';
+import Image from 'next/image';
+
 
 interface GitHubRepoPickerProps {
   projectId: string;
@@ -28,7 +30,6 @@ export function GitHubRepoPicker({
   onSuccess,
 }: GitHubRepoPickerProps) {
   const { user } = useSupabaseSession();
-  const [loading, setLoading] = useState(true);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [filteredRepos, setFilteredRepos] = useState<GitHubRepo[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,7 +69,6 @@ export function GitHubRepoPicker({
     if (!isGitHubUser || !githubToken) {
       setStatus('error');
       setError('Please sign in with GitHub to access your repositories');
-      setLoading(false);
       return;
     }
 
@@ -78,7 +78,6 @@ export function GitHubRepoPicker({
   const fetchRepos = async () => {
     if (!githubToken) return;
 
-    setLoading(true);
     try {
       const response = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', {
         headers: {
@@ -98,8 +97,6 @@ export function GitHubRepoPicker({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch repositories');
       setStatus('error');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -184,7 +181,7 @@ export function GitHubRepoPicker({
         {/* Header */}
         <div className="flex items-center gap-3 p-6 border-b border-[#3a3a3a]">
           <div className="w-10 h-10 bg-[#7ed321]/10 border border-[#7ed321]/30 rounded-lg flex items-center justify-center">
-            <Github className="w-5 h-5 text-[#7ed321]" />
+            <Image src="/components/ui/brandIcons/github.svg" alt="GitHub" width={20} height={20} />
           </div>
           <div>
             <h2 className="text-lg font-bold text-white font-mono">Connect GitHub Repository</h2>
@@ -411,7 +408,7 @@ export function GitHubRepoPicker({
                   </>
                 ) : (
                   <>
-                    <Github className="w-4 h-4" />
+                    <Image src="/components/ui/brandIcons/github.svg" alt="GitHub" width={20} height={20} />
                     Connect Repository
                   </>
                 )}

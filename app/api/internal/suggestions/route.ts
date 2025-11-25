@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerClient } from '@/lib/supabase/server';
+import { createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse } from '@/lib/utils/api-errors';
 import {
   markSuggestionAsApplied,
   markSuggestionAsDismissed,
@@ -8,13 +9,9 @@ import {
   getSuggestions,
   bulkUpdateSuggestionStatus,
   getSuggestionStats,
-  type SuggestionStatus,
 } from '@/lib/supabase/suggestions';
+import type { SuggestionStatus } from '@/lib/types';
 
-/**
- * GET /api/internal/suggestions
- * Fetch suggestions for a project
- */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const projectId = searchParams.get('projectId');
@@ -22,18 +19,17 @@ export async function GET(request: Request) {
   const statsOnly = searchParams.get('stats') === 'true';
 
   if (!projectId) {
-    return NextResponse.json({ error: 'Project ID required' }, { status: 400 });
+    return createBadRequestResponse('Project ID required');
   }
 
   const supabase = await getServerClient();
 
-  // Verify user owns this project
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return createUnauthorizedResponse();
   }
 
   const { data: project } = await supabase
@@ -44,10 +40,7 @@ export async function GET(request: Request) {
     .single();
 
   if (!project) {
-    return NextResponse.json(
-      { error: 'Project not found or access denied' },
-      { status: 404 }
-    );
+    return createNotFoundResponse('Project not found or access denied');
   }
 
   // Return stats only
@@ -81,10 +74,7 @@ export async function PATCH(request: Request) {
   }
 
   if (!suggestionId && !suggestionIds) {
-    return NextResponse.json(
-      { error: 'suggestionId or suggestionIds required' },
-      { status: 400 }
-    );
+    return createBadRequestResponse('suggestionId or suggestionIds required');
   }
 
   const supabase = await getServerClient();
@@ -94,9 +84,9 @@ export async function PATCH(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+    if (!user) {
+      return createUnauthorizedResponse();
+    }
 
   // Verify ownership
   const ids = suggestionId ? [suggestionId] : suggestionIds!;
@@ -106,10 +96,7 @@ export async function PATCH(request: Request) {
     .in('id', ids);
 
   if (!suggestions || suggestions.length === 0) {
-    return NextResponse.json(
-      { error: 'Suggestion(s) not found' },
-      { status: 404 }
-    );
+    return createNotFoundResponse('Suggestion(s) not found');
   }
 
   // Verify all suggestions belong to user's projects
@@ -151,7 +138,7 @@ export async function PATCH(request: Request) {
     } else if (action === 'archive') {
       result = await archiveSuggestion(supabase, suggestionId!);
     } else {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return createBadRequestResponse('Invalid action');
     }
   }
 

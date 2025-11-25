@@ -1,20 +1,15 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { videoUrls } from '@/lib/supabase/storage';
 
-/**
- * Raccoon Welcome Animation
- * Shows the hi.mp4 video once after successful authentication
- */
+
 export function RaccoonWelcome({ onComplete }: { onComplete: () => void }) {
-  const [videoEnded, setVideoEnded] = useState(false);
+
 
   useEffect(() => {
-    // Auto-complete after 3 seconds as fallback
     const fallback = setTimeout(() => {
-      setVideoEnded(true);
       onComplete();
     }, 3000);
 
@@ -22,8 +17,7 @@ export function RaccoonWelcome({ onComplete }: { onComplete: () => void }) {
   }, [onComplete]);
 
   const handleVideoEnd = () => {
-    setVideoEnded(true);
-    setTimeout(onComplete, 500); // Small delay before transitioning
+    setTimeout(onComplete, 500); 
   };
 
   return (
@@ -48,7 +42,6 @@ export function RaccoonWelcome({ onComplete }: { onComplete: () => void }) {
           onEnded={handleVideoEnd}
           onError={(e) => {
             console.error('Hi video failed to load:', e);
-            // Fallback - just complete
             handleVideoEnd();
           }}
           className="w-full h-auto rounded-lg"

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useSupabaseClient } from '@/lib/auth/hooks';
-import type { Suggestion, Table, CodeReference } from '../types';
-import type { DatabaseSchemaSnapshot, TableSchema, IndexSchema } from '@/lib/supabase/introspect';
+import type { Suggestion, Table, CodeReference } from '@/lib/types';
+import type { DatabaseSchemaSnapshot, TableSchema, IndexSchema, ColumnSchema } from '@/lib/types';
 
 interface DashboardData {
   tables: Table[];
@@ -16,7 +16,7 @@ interface DashboardData {
 type SchemaSnapshotRow = {
   id: string;
   tables_data: unknown;
-  columns_data: unknown;  // ADDED - needed for column information!
+  columns_data: unknown;
   indexes_data: unknown;
   relationships_data: unknown;
   created_at: string;
@@ -34,10 +34,6 @@ type SuggestionRow = {
   status: string | null;
 };
 
-/**
- * Hook to fetch dashboard data (tables, suggestions) for a project
- * Uses singleton Supabase client via useSupabaseClient
- */
 export function useDashboardData(projectId?: string): DashboardData {
   const supabase = useSupabaseClient();
   const [tables, setTables] = useState<Table[]>([]);
@@ -73,7 +69,7 @@ export function useDashboardData(projectId?: string): DashboardData {
       {}
     );
 
-    return snapshot.tables.map((table, index) => {
+    return snapshot.tables.map((table) => {
       const key = `${table.schema}.${table.tableName}`;
       const columns = columnsGrouped[key] ?? [];
       const columnEntries = columns.map((column) => ({
@@ -93,7 +89,7 @@ export function useDashboardData(projectId?: string): DashboardData {
         name: table.tableName,
         columns: columnEntries,
         rowCount,
-        position: { x: 0, y: 0 }, // Dagre will calculate actual position
+        position: { x: 0, y: 0 },
         columnCount,
       } as Table;
     });
@@ -105,7 +101,7 @@ export function useDashboardData(projectId?: string): DashboardData {
         .from('optimization_suggestions')
         .select('*')
         .eq('project_id', projectId)
-        .in('status', ['pending', 'applied', 'dismissed']) // Show all active suggestions
+        .in('status', ['pending', 'applied', 'dismissed'])
         .order('created_at', { ascending: false });
 
       if (queryError) {
@@ -180,7 +176,7 @@ export function useDashboardData(projectId?: string): DashboardData {
       } else {
         const schema: DatabaseSchemaSnapshot = {
           tables: (snapshot.tables_data as TableSchema[]) || [],
-          columns: (snapshot.columns_data as any[]) || [], 
+          columns: (snapshot.columns_data as ColumnSchema[]) || [], 
           indexes: (snapshot.indexes_data as IndexSchema[]) || [],
         };
 

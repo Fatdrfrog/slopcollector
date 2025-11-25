@@ -2,9 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { queryKeys } from '@/lib/constants/query-keys';
 import { useSupabaseClient } from '@/lib/auth/hooks';
-import type { Suggestion, CodeReference } from '@/app/types';
+import type { Suggestion, CodeReference } from '@/lib/types';
 import { logger } from '@/lib/utils/logger';
 
 interface SuggestionRow {
@@ -28,7 +30,7 @@ interface CodePatternRow {
   frequency: number;
 }
 
-async function fetchSuggestions(supabase: any, projectId: string) {
+async function fetchSuggestions(supabase: SupabaseClient, projectId: string) {
   logger.debug('Fetching suggestions for project:', projectId);
 
   const { data, error } = await supabase
@@ -47,7 +49,7 @@ async function fetchSuggestions(supabase: any, projectId: string) {
   return (data ?? []) as SuggestionRow[];
 }
 
-async function fetchCodePatterns(supabase: any, projectId: string) {
+async function fetchCodePatterns(supabase: SupabaseClient, projectId: string) {
   const { data, error } = await supabase
     .from('code_patterns')
     .select('*')

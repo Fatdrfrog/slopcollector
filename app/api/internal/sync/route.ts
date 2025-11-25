@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/lib/supabase/serviceClient';
 import { introspectSupabaseProject } from '@/lib/supabase/introspect';
+import { createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse, createInternalErrorResponse } from '@/lib/utils/api-errors';
 
 interface SyncRequestBody {
   projectId: string;
@@ -21,11 +22,11 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return createUnauthorizedResponse();
     }
 
     if (!body.projectId) {
-      return NextResponse.json({ error: 'Project ID required' }, { status: 400 });
+      return createBadRequestResponse('Project ID required');
     }
 
     const serviceClient = getServiceClient();
@@ -38,10 +39,7 @@ export async function POST(request: Request) {
       .single();
 
     if (projectError || !project) {
-      return NextResponse.json(
-        { error: 'Project not found or access denied' },
-        { status: 404 }
-      );
+      return createNotFoundResponse('Project not found or access denied');
     }
     
     const schema = await introspectSupabaseProject(
@@ -50,10 +48,7 @@ export async function POST(request: Request) {
     );
 
     if (!schema || schema.tables.length === 0) {
-      return NextResponse.json(
-        { error: 'No tables found. Make sure your Supabase project has tables in the public schema.' },
-        { status: 400 }
-      );
+      return createBadRequestResponse('No tables found. Make sure your Supabase project has tables in the public schema.');
     }
 
     const { data: snapshot, error: snapshotError } = await serviceClient
@@ -71,10 +66,7 @@ export async function POST(request: Request) {
 
     if (snapshotError) {
       console.error('Snapshot error:', snapshotError);
-      return NextResponse.json(
-        { error: 'Failed to save schema snapshot', details: snapshotError.message },
-        { status: 500 }
-      );
+      return createInternalErrorResponse('Failed to save schema snapshot', snapshotError.message);
     }
 
     await serviceClient
@@ -98,12 +90,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Sync error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to sync project', 
-        details: error instanceof Error ? error.message : 'Unknown error' 
-      },
-      { status: 500 }
+    return createInternalErrorResponse(
+      'Failed to sync project',
+      error instanceof Error ? error.message : 'Unknown error'
     );
   }
 }

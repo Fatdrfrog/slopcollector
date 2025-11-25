@@ -2,21 +2,18 @@ import { NextResponse } from 'next/server';
 import { getServerClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/lib/supabase/serviceClient';
 import { analyzeCodePatterns } from '@/lib/github/codeAnalyzer';
+import { TableSchema } from '@/lib/types';
 
 interface AnalyzeRequestBody {
   projectId: string;
 }
 
-/**
- * Analyze GitHub repository code for database query patterns
- * POST /api/internal/github/analyze
- */
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AnalyzeRequestBody;
     const supabase = await getServerClient();
 
-    // Verify user authentication
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -31,7 +28,6 @@ export async function POST(request: Request) {
 
     const serviceClient = getServiceClient();
 
-    // Fetch project and verify ownership
     const { data: project, error: projectError } = await serviceClient
       .from('connected_projects')
       .select('*')
@@ -46,7 +42,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if GitHub is enabled
     if (!project.github_enabled || !project.github_repo_url) {
       return NextResponse.json(
         { error: 'GitHub integration not enabled for this project' },
@@ -54,7 +49,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get latest schema snapshot for table names
     const { data: snapshot, error: snapshotError } = await serviceClient
       .from('schema_snapshots')
       .select('tables_data')
@@ -70,9 +64,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Extract table names from schema
-    const tables = (snapshot.tables_data as any[]) || [];
-    const tableNames = tables.map((t) => t.tableName || t.table_name);
+    const tables = (snapshot.tables_data as TableSchema[]) || [];
+    const tableNames = tables.map((t) => t.tableName);
 
     if (tableNames.length === 0) {
       return NextResponse.json(
@@ -81,20 +74,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Analyze code patterns
     const patterns = await analyzeCodePatterns(
       project.github_repo_url,
       project.github_default_branch || 'main',
       tableNames
     );
 
-    // Delete old patterns for this project
     await serviceClient
       .from('code_patterns')
       .delete()
       .eq('project_id', project.id);
 
-    // Store new patterns
     if (patterns.length > 0) {
       const patternRecords = patterns.map((pattern) => ({
         project_id: project.id,
@@ -116,7 +106,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Update project's last synced timestamp
     await serviceClient
       .from('connected_projects')
       .update({
@@ -124,7 +113,6 @@ export async function POST(request: Request) {
       })
       .eq('id', project.id);
 
-    // Generate summary
     const tablesAnalyzed = [...new Set(patterns.map((p) => p.tableName))];
     const filterPatterns = patterns.filter((p) => p.patternType === 'filter');
     const topColumns = filterPatterns

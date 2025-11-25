@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { AlertCircle, Info, AlertTriangle, Code, FileCode, Check, X, RotateCcw } from 'lucide-react';
-import type { Suggestion } from '../types';
+import type { Suggestion } from '@/lib/types';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 
@@ -18,6 +18,8 @@ function getSeverityIcon(severity: Suggestion['severity']) {
       return <AlertTriangle className="w-4 h-4 text-amber-600" />;
     case 'info':
       return <Info className="w-4 h-4 text-blue-600" />;
+    default:
+      return <Info className="w-4 h-4 text-blue-600" />;
   }
 }
 
@@ -29,13 +31,12 @@ function getSeverityStyles(severity: Suggestion['severity']) {
       return 'bg-amber-950/30 border-amber-900';
     case 'info':
       return 'bg-blue-950/30 border-blue-900';
+    default:
+      return 'bg-blue-950/30 border-blue-900';
   }
 }
 
-/**
- * Individual suggestion card component with status tracking
- * Memoized to prevent re-renders when parent updates
- */
+
 export const SuggestionCard = memo(function SuggestionCard({ 
   suggestion, 
   onSelectTable,
@@ -51,12 +52,11 @@ export const SuggestionCard = memo(function SuggestionCard({
   };
 
   const handleStatusUpdate = async (action: 'apply' | 'dismiss' | 'reopen', e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
+    e.stopPropagation(); 
     
     setIsUpdating(true);
     const previousStatus = localStatus;
     
-    // Optimistic update
     const newStatus = action === 'apply' ? 'applied' : action === 'dismiss' ? 'dismissed' : 'pending';
     setLocalStatus(newStatus);
 
@@ -73,14 +73,12 @@ export const SuggestionCard = memo(function SuggestionCard({
 
       const data = await response.json();
       
-      // Notify parent component
       if (onStatusChange) {
         onStatusChange(suggestion.id, newStatus);
       }
 
       toast.success(data.message || `Suggestion ${action === 'apply' ? 'marked as applied' : action === 'dismiss' ? 'dismissed' : 'reopened'}`);
     } catch (error) {
-      // Revert optimistic update on error
       setLocalStatus(previousStatus);
       toast.error('Failed to update suggestion status');
       console.error('Error updating suggestion status:', error);
@@ -96,7 +94,6 @@ export const SuggestionCard = memo(function SuggestionCard({
       onClick={handleClick}
       className={`p-3.5 rounded-xl border backdrop-blur-sm ${getSeverityStyles(suggestion.severity)} transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer group ${isCompleted ? 'opacity-60' : ''}`}
     >
-      {/* Header with Status Badge */}
       <div className="flex items-start gap-2.5 mb-2.5">
         {getSeverityIcon(suggestion.severity)}
         <div className="flex-1 min-w-0">
@@ -133,12 +130,10 @@ export const SuggestionCard = memo(function SuggestionCard({
         </div>
       </div>
       
-      {/* Description */}
       <p className="text-xs text-gray-300 mb-2.5 leading-relaxed">
         {suggestion.description}
       </p>
       
-      {/* Code References */}
       {suggestion.codeReferences && suggestion.codeReferences.length > 0 && (
         <div className="mt-2.5 pt-2.5 border-t border-gray-800/50">
           <div className="flex items-center gap-1.5 mb-1.5">
@@ -153,7 +148,7 @@ export const SuggestionCard = memo(function SuggestionCard({
                   {ref.filePath}
                   {ref.lineNumber && `:${ref.lineNumber}`}
                 </code>
-                <span className="text-[#7ed321] font-bold flex-shrink-0">
+                <span className="text-[#7ed321] font-bold shrink-0">
                   {ref.frequency}x
                 </span>
               </div>
@@ -167,15 +162,13 @@ export const SuggestionCard = memo(function SuggestionCard({
         </div>
       )}
 
-      {/* Impact/Action */}
       {suggestion.impact && (
         <div className="flex items-start gap-2 text-xs text-gray-400 bg-[#0f0f0f]/80 px-3 py-2 rounded-lg font-mono border border-gray-800/50 group-hover:border-gray-700/80 transition-colors mt-2.5">
-          <span className="text-indigo-500 opacity-60 flex-shrink-0">$</span>
+          <span className="text-indigo-500 opacity-60 shrink-0">$</span>
           <span className="flex-1 leading-relaxed">{suggestion.impact}</span>
         </div>
       )}
 
-      {/* Action Buttons */}
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-800/50" onClick={(e) => e.stopPropagation()}>
         {localStatus === 'pending' || !localStatus ? (
           <>

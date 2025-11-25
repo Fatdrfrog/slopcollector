@@ -47,7 +47,7 @@ export function DashboardContent({
         <EmptyState onSync={onSync} isSyncing={loading} />
       ) : (
         <>
-          <ResizablePanel defaultSize={75}>
+          <ResizablePanel defaultSize={60}>
             <ERDCanvas
               tables={tables}
               selectedTable={selectedTable}
@@ -58,7 +58,7 @@ export function DashboardContent({
           <ResizableHandle withHandle />
 
           {showSuggestions && (
-            <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+            <ResizablePanel defaultSize={40}>
               <motion.div
                 initial={{ x: 420, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}

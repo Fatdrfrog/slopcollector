@@ -20,7 +20,14 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
   onStatusChange,
 }: SuggestionsPanelProps) {
   const filteredSuggestions = useMemo(
-    () => selectedTable ? suggestions.filter(s => s.tableId === selectedTable.id) : suggestions,
+    () => {
+      const activeSuggestions = suggestions.filter(s => 
+        s.status === 'pending' || s.status === null || !s.status
+      );
+      return selectedTable 
+        ? activeSuggestions.filter(s => s.tableId === selectedTable.id) 
+        : activeSuggestions;
+    },
     [suggestions, selectedTable]
   );
 
@@ -62,7 +69,7 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
         </p>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         {isLoading ? (
           <LoadingState />
         ) : filteredSuggestions.length === 0 ? (

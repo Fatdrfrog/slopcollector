@@ -18,7 +18,7 @@ interface SuggestionRow {
   title: string;
   description: string;
   sql_snippet: string | null;
-  status: string | null;
+  status: 'pending' | 'applied' | 'dismissed' | null;
 }
 
 interface CodePatternRow {
@@ -134,6 +134,7 @@ export function useSuggestionsQuery(projectId?: string) {
           description: item.description,
           impact: item.sql_snippet ?? undefined,
           codeReferences: codeReferences.length > 0 ? codeReferences : undefined,
+          status: item.status || 'pending',
         };
       });
 

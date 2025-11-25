@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { AlertCircle, Info, AlertTriangle, Code, FileCode, Check, X, RotateCcw } from 'lucide-react';
 import type { Suggestion } from '@/lib/types';
 import { Button } from './ui/button';
@@ -45,6 +45,11 @@ export const SuggestionCard = memo(function SuggestionCard({
   const [isUpdating, setIsUpdating] = useState(false);
   const [localStatus, setLocalStatus] = useState(suggestion.status || 'pending');
 
+  // Sync localStatus with prop changes (e.g., after refetch)
+  useEffect(() => {
+    setLocalStatus(suggestion.status || 'pending');
+  }, [suggestion.status]);
+
   const handleClick = () => {
     if (onSelectTable && suggestion.tableId) {
       onSelectTable(suggestion.tableId);
@@ -73,6 +78,7 @@ export const SuggestionCard = memo(function SuggestionCard({
 
       const data = await response.json();
       
+      // Trigger refetch to sync with database
       if (onStatusChange) {
         onStatusChange(suggestion.id, newStatus);
       }

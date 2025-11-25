@@ -133,6 +133,10 @@ export function DashboardLayout({
         onTableSelect={onTableSelect}
         onSync={onRefresh}
         onGenerateAdvice={onGenerateAdvice}
+        onStatusChange={async () => {
+          // Refetch suggestions after status change to sync with database
+          await onRefresh();
+        }}
       />
 
       {showCommandPalette && (

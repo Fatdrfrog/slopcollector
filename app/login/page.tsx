@@ -248,6 +248,29 @@ function LoginPageContent() {
                 <p className="text-sm text-[#ccc] font-mono">Developer-friendly interface</p>
               </div>
             </motion.div>
+
+            {/* Product Hunt Badge */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="mt-8 flex justify-center lg:justify-start"
+            >
+              <a 
+                href="https://www.producthunt.com/products/slopcollector?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-slopcollector" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block transition-transform hover:scale-105"
+              >
+                <img 
+                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1042458&theme=light&t=1764102571390" 
+                  alt="SlopCollector - Find the slop in your supabase | Product Hunt" 
+                  style={{ width: '250px', height: '54px' }}
+                  width={250}
+                  height={54}
+                />
+              </a>
+            </motion.div>
           </div>
         </motion.div>
 

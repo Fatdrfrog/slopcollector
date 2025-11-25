@@ -4,7 +4,7 @@
 
 SlopCollector is a developer tool that connects to your Supabase project, analyzes your schema, and uses AI to find missing indexes, catch slow queries, and suggest optimizations.
 
-![SlopCollector Dashboard](https://raw.githubusercontent.com/yourusername/slopcollector/main/public/demo.png)
+![SlopCollector Dashboard](https://raw.githubusercontent.com/Fatdrfrog/slopcollector/main/public/demo.png)
 
 ## Features
 
@@ -61,7 +61,7 @@ SlopCollector is a developer tool that connects to your Supabase project, analyz
 
 You can easily deploy SlopCollector to Vercel.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyourusername%2Fslopcollector)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FFatdrfrog%2Fslopcollector)
 
 ## License
 

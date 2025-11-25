@@ -17,7 +17,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * 6. Track applied suggestions by comparing current indexes with suggested SQL
  */
 export async function GET(request: Request) {
-  // Verify this is a legitimate cron request from Vercel
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -49,7 +48,6 @@ export async function GET(request: Request) {
   };
 
   try {
-    // Get all active projects
     const { data: projects, error: projectsError } = await serviceClient
       .from('connected_projects')
       .select('id, project_name, supabase_url, supabase_anon_key, user_id')
@@ -69,7 +67,6 @@ export async function GET(request: Request) {
       });
     }
 
-    // Process each project
     for (const project of projects) {
       try {
         await processProjectAdvice(serviceClient, project, results);
@@ -119,7 +116,6 @@ async function processProjectAdvice(
     skipped: number;
   }
 ) {
-  // Get latest schema snapshot
   const { data: snapshot, error: snapshotError } = await serviceClient
     .from('schema_snapshots')
     .select('*')
@@ -129,12 +125,10 @@ async function processProjectAdvice(
     .single();
 
   if (snapshotError || !snapshot) {
-    console.log(`No snapshot found for project ${project.id}, skipping`);
     results.skipped++;
     return;
   }
 
-  // Check if we've generated advice recently (within last 6 hours)
   const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
   const { data: recentJob } = await serviceClient
     .from('analysis_jobs')
@@ -148,12 +142,10 @@ async function processProjectAdvice(
     .maybeSingle();
 
   if (recentJob) {
-    console.log(`Recent advice exists for project ${project.id}, skipping`);
     results.skipped++;
     return;
   }
 
-  // Create analysis job
   const { data: job, error: jobError } = await serviceClient
     .from('analysis_jobs')
     .insert({
@@ -170,21 +162,18 @@ async function processProjectAdvice(
   }
 
   try {
-    // Generate AI suggestions using shared service
     const advice = await generateAIAdviceForProject(serviceClient, project.id, {
       projectName: project.project_name || 'Unnamed Project',
       skipRecentCheck: true, // Cron handles its own cooldown logic
       cooldownHours: 6,
     });
 
-    // Build schema snapshot for storage
     const schemaSnapshot: DatabaseSchemaSnapshot = {
       tables: (snapshot.tables_data as any[]) || [],
       columns: (snapshot.columns_data as any[]) || [],
       indexes: (snapshot.indexes_data as any[]) || [],
     };
 
-    // Store suggestions with deduplication and applied detection
     const storeResult = await storeAdviceSuggestions(
       serviceClient,
       project.id,
@@ -193,11 +182,9 @@ async function processProjectAdvice(
       { schemaSnapshot }
     );
 
-    // Update results
     results.newSuggestions += storeResult.newSuggestions;
     results.appliedDetected += storeResult.appliedDetected;
 
-    // Update job status
     await serviceClient
       .from('analysis_jobs')
       .update({
@@ -212,7 +199,6 @@ async function processProjectAdvice(
       })
       .eq('id', job.id);
   } catch (error) {
-    // Update job as failed
     await serviceClient
       .from('analysis_jobs')
       .update({

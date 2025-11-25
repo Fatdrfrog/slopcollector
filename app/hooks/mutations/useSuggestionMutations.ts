@@ -1,10 +1,3 @@
-/**
- * Suggestion mutation hooks using React Query
- * 
- * This provides optimistic updates and automatic cache invalidation
- * for suggestion actions (apply, dismiss, archive).
- */
-
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -22,20 +15,6 @@ interface BulkSuggestionActionParams {
   action: 'apply' | 'dismiss';
 }
 
-/**
- * Hook for applying/dismissing/archiving a single suggestion
- * 
- * Features:
- * - Optimistic updates
- * - Automatic cache invalidation
- * - Toast notifications
- * 
- * Usage:
- * ```tsx
- * const applyMutation = useSuggestionAction(projectId);
- * applyMutation.mutate({ suggestionId: '123', action: 'apply' });
- * ```
- */
 export function useSuggestionAction(projectId: string) {
   const queryClient = useQueryClient();
 
@@ -55,11 +34,9 @@ export function useSuggestionAction(projectId: string) {
       return response.json();
     },
     onSuccess: (_, variables) => {
-      // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: queryKeys.suggestions.all(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.suggestions(projectId) });
 
-      // Show success toast
       const actionText = variables.action === 'apply' ? 'applied' : 
                          variables.action === 'dismiss' ? 'dismissed' : 'archived';
       toast.success(`Suggestion ${actionText} successfully`);
@@ -70,15 +47,6 @@ export function useSuggestionAction(projectId: string) {
   });
 }
 
-/**
- * Hook for bulk actions on suggestions
- * 
- * Usage:
- * ```tsx
- * const bulkAction = useBulkSuggestionAction(projectId);
- * bulkAction.mutate({ suggestionIds: ['1', '2', '3'], action: 'apply' });
- * ```
- */
 export function useBulkSuggestionAction(projectId: string) {
   const queryClient = useQueryClient();
 
@@ -98,7 +66,6 @@ export function useBulkSuggestionAction(projectId: string) {
       return response.json();
     },
     onSuccess: (_, variables) => {
-      // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: queryKeys.suggestions.all(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.suggestions(projectId) });
 

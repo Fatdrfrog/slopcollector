@@ -23,13 +23,11 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
   isLoading = false,
   onStatusChange,
 }: SuggestionsPanelProps) {
-  // Memoize filtered suggestions to prevent recalculation on every render
   const filteredSuggestions = useMemo(
     () => selectedTable ? suggestions.filter(s => s.tableId === selectedTable.id) : suggestions,
     [suggestions, selectedTable]
   );
 
-  // Memoize grouped suggestions
   const groupedSuggestions = useMemo(() => {
     return filteredSuggestions.reduce((acc, suggestion) => {
       if (!acc[suggestion.severity]) {

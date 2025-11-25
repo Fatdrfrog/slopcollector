@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSupabaseClient } from '@/lib/auth/hooks';
 
-/**
- * Hook to manage project state, particularly tracking if suggestions
- * have been generated before for the current project
- */
 export function useProjectState(
   activeProjectId: string | null | undefined,
   suggestionsCount: number,
@@ -12,7 +8,6 @@ export function useProjectState(
   const supabaseClient = useSupabaseClient();
   const [hasGeneratedBefore, setHasGeneratedBefore] = useState(false);
 
-  // Check if suggestions have been generated before for this project
   useEffect(() => {
     const checkState = async () => {
       if (!activeProjectId || !supabaseClient) {
@@ -21,7 +16,6 @@ export function useProjectState(
       }
 
       try {
-        // Check if there are any suggestions or analysis jobs for this project
         const [suggestionsResult, completedJobsResult] = await Promise.all([
           supabaseClient
             .from('optimization_suggestions')
@@ -50,7 +44,6 @@ export function useProjectState(
     void checkState();
   }, [activeProjectId, supabaseClient]);
 
-  // Also update hasGeneratedBefore when suggestions are loaded
   useEffect(() => {
     if (suggestionsCount > 0) {
       setHasGeneratedBefore(true);

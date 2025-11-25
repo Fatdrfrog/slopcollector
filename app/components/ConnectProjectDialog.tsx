@@ -45,12 +45,12 @@ interface ConnectProjectDialogProps {
 }
 
 type FlowStatus = 
-  | 'input'           // User entering credentials
-  | 'connecting'      // Verifying credentials
-  | 'syncing'         // Fetching schema from Supabase
-  | 'analyzing'       // Running AI advice
-  | 'complete'        // All done, showing success
-  | 'error';          // Something went wrong
+  | 'input'
+  | 'connecting'
+  | 'syncing'
+  | 'analyzing'
+  | 'complete'
+  | 'error';
 
 const normalizeSupabaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
 
@@ -79,10 +79,6 @@ const deriveProjectName = (url: string) => {
   }
 };
 
-/**
- * Dialog for connecting a new Supabase project
- * Only shown to authenticated users
- */
 export function ConnectProjectDialog({
   open,
   onOpenChange,
@@ -105,7 +101,6 @@ export function ConnectProjectDialog({
     },
   });
 
-  // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       setTimeout(() => {
@@ -114,7 +109,7 @@ export function ConnectProjectDialog({
         setProjectName(undefined);
         setProgress({ tablesFound: 0, suggestionsGenerated: 0 });
         form.reset();
-      }, 300); // After dialog animation
+      }, 300);
     }
   }, [open, form]);
 
@@ -129,7 +124,6 @@ export function ConnectProjectDialog({
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      // Step 1: Verify credentials
       const testResponse = await fetch(`${normalizedUrl}/rest/v1/`, {
         headers: {
           apikey: supabaseKey,
@@ -144,7 +138,6 @@ export function ConnectProjectDialog({
         throw new Error('Invalid Supabase credentials. Check your URL and API key.');
       }
 
-      // Step 2: Connect project to database
       const connectResponse = await fetch('/api/internal/projects/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -166,17 +159,13 @@ export function ConnectProjectDialog({
 
       clearTimeout(timeoutId);
 
-      // Step 3: Sync schema from Supabase
       await syncSchema(newProjectId);
 
-      // Step 4: Generate AI advice
       await generateAdvice(newProjectId);
 
-      // Step 5: Success!
       setStatus('complete');
       authToasts.connectionSuccess();
       
-      // Wait 2 seconds to show success, then close and refresh
       setTimeout(() => {
         form.reset();
         onOpenChange(false);
@@ -239,11 +228,9 @@ export function ConnectProjectDialog({
     }));
   };
 
-  // Prevent closing during loading states
   const handleOpenChange = (newOpen: boolean) => {
-    // Only allow closing when in input, complete, or error state
     if (!newOpen && (status === 'connecting' || status === 'syncing' || status === 'analyzing')) {
-      return; // Prevent closing during processing
+      return;
     }
     onOpenChange(newOpen);
   };
@@ -251,7 +238,6 @@ export function ConnectProjectDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="bg-[#2a2a2a] border-[#3a3a3a] text-white max-w-md" onEscapeKeyDown={(e) => {
-        // Prevent ESC key closing during processing
         if (status === 'connecting' || status === 'syncing' || status === 'analyzing') {
           e.preventDefault();
         }
@@ -265,7 +251,6 @@ export function ConnectProjectDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Input State - Enter credentials */}
         {status === 'input' && (
           <>
             <div className="bg-[#4ecdc4]/10 border border-[#4ecdc4]/30 rounded-lg p-3 mb-2">
@@ -369,7 +354,6 @@ export function ConnectProjectDialog({
           </>
         )}
 
-        {/* Connecting State */}
         {status === 'connecting' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -392,7 +376,6 @@ export function ConnectProjectDialog({
           </motion.div>
         )}
 
-        {/* Syncing State */}
         {status === 'syncing' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -415,7 +398,6 @@ export function ConnectProjectDialog({
           </motion.div>
         )}
 
-        {/* Analyzing State */}
         {status === 'analyzing' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -444,7 +426,6 @@ export function ConnectProjectDialog({
           </motion.div>
         )}
 
-        {/* Complete State */}
         {status === 'complete' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -485,7 +466,6 @@ export function ConnectProjectDialog({
           </motion.div>
         )}
 
-        {/* Error State */}
         {status === 'error' && error && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}

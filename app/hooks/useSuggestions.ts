@@ -17,22 +17,9 @@ interface SuggestionStats {
   bySeverity: Record<string, number>;
 }
 
-/**
- * Hook for managing optimization suggestions
- * Now uses mutation hooks - DRY and consistent!
- * 
- * Usage:
- * ```tsx
- * const { suggestions, loading, apply, dismiss } = useSuggestions({
- *   projectId: 'xxx',
- *   status: 'pending',
- * });
- * ```
- */
 export function useSuggestions(options: UseSuggestionsOptions) {
   const { projectId } = options;
 
-  // Use the query hook for fetching
   const {
     data: suggestions = [],
     isLoading: loading,
@@ -40,14 +27,12 @@ export function useSuggestions(options: UseSuggestionsOptions) {
     refetch,
   } = useSuggestionsQuery(projectId);
 
-  // Use mutation hooks for actions (automatic cache invalidation!)
   const applySingle = useSuggestionAction(projectId);
   const dismissSingle = useSuggestionAction(projectId);
   const archiveSingle = useSuggestionAction(projectId);
   const applyBulk = useBulkSuggestionAction(projectId);
   const dismissBulk = useBulkSuggestionAction(projectId);
 
-  // Compute stats from suggestions
   const stats: SuggestionStats = {
     total: suggestions.length,
     pending: suggestions.filter((s: any) => s.severity === 'pending').length,
@@ -65,7 +50,6 @@ export function useSuggestions(options: UseSuggestionsOptions) {
     loading: loading || applySingle.isPending || dismissSingle.isPending,
     error: error?.message || applySingle.error?.message || dismissSingle.error?.message,
 
-    // Actions - now using mutations!
     apply: (suggestionId: string) => 
       applySingle.mutateAsync({ suggestionId, action: 'apply' }),
     dismiss: (suggestionId: string) => 
@@ -74,17 +58,13 @@ export function useSuggestions(options: UseSuggestionsOptions) {
       archiveSingle.mutateAsync({ suggestionId, action: 'archive' }),
     bulkApply: (suggestionIds: string[]) => 
       applyBulk.mutateAsync({ suggestionIds, action: 'apply' }),
-    bulkDismiss: (suggestionIds: string[]) => 
+    bulkDismiss: (suggestionIds: string[]) =>
       dismissBulk.mutateAsync({ suggestionIds, action: 'dismiss' }),
 
-    // Manual refresh
     refresh: refetch,
   };
 }
 
-/**
- * Lightweight hook for suggestion statistics only
- */
 export function useSuggestionStats(projectId: string) {
   const { stats, loading, error } = useSuggestions({ projectId });
   

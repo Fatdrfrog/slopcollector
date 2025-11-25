@@ -75,7 +75,6 @@ export function ErrorBoundaryWrapper({ children, onReset }: ErrorBoundaryWrapper
       FallbackComponent={ErrorFallback}
       onReset={onReset}
       onError={(error, errorInfo) => {
-        // Log to error tracking service
         console.error('Error caught by boundary:', error, errorInfo);
       }}
     >

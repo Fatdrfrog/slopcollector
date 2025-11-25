@@ -17,7 +17,6 @@ export function useAdviceGeneration(
   const [adviceError, setAdviceError] = useState<string>();
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
 
-  // Poll for pending jobs if isGeneratingAdvice is true
   useEffect(() => {
     if (!isGeneratingAdvice || !activeProjectId || !supabaseClient) return;
 
@@ -31,10 +30,9 @@ export function useAdviceGeneration(
         .limit(1);
 
       if (!pendingJobs || pendingJobs.length === 0) {
-        // Job finished (or failed)
         setIsGeneratingAdvice(false);
         clearInterval(pollInterval);
-        refresh(); // Refresh to get new suggestions
+        refresh();
         setStatusMessage({ type: 'success', message: 'Analysis completed!' });
         setTimeout(() => setStatusMessage(null), 3000);
       }
@@ -67,7 +65,6 @@ export function useAdviceGeneration(
 
       const result = await response.json();
 
-      // If the API returns immediately (async mode) or after completion:
       if (result.status === 'completed') {
         await refresh();
         setHasGeneratedBefore(true);
@@ -79,7 +76,6 @@ export function useAdviceGeneration(
         setTimeout(() => setStatusMessage(null), 4000);
         setIsGeneratingAdvice(false);
       }
-      // If it returns 'pending', polling takes over (via the effect we added).
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to run AI advice.';

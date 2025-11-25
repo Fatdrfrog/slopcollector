@@ -30,7 +30,6 @@ export async function POST(request: Request) {
 
     const serviceClient = getServiceClient();
 
-    // Get project credentials
     const { data: project, error: projectError } = await serviceClient
       .from('connected_projects')
       .select('*')
@@ -78,7 +77,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Update project's last_synced_at
     await serviceClient
       .from('connected_projects')
       .update({ last_synced_at: new Date().toISOString() })

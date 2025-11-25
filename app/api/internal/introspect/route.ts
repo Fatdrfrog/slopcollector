@@ -8,10 +8,6 @@ interface IntrospectRequestBody {
   schema?: string;
 }
 
-/**
- * Introspect a connected Supabase project's schema
- * Uses Supabase REST API instead of direct pg connection
- */
 export async function POST(request: Request) {
   const body = (await request.json()) as IntrospectRequestBody;
   const projectId = body.projectId;
@@ -35,7 +31,6 @@ export async function POST(request: Request) {
 
   const serviceClient = getServiceClient();
 
-  // Get connected project with credentials
   const { data: project, error: projectError } = await serviceClient
     .from('connected_projects')
     .select('*')
@@ -58,14 +53,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Introspect using Supabase credentials (not pg connection)
     const schemaSnapshot = await introspectSupabaseProject(
       project.supabase_url,
       project.supabase_anon_key,
       requestedSchema
     );
 
-    // Extract foreign key relationships from columns
     const relationships = schemaSnapshot.columns
       .filter((col) => col.foreignKeyTo)
       .map((col) => ({
@@ -82,7 +75,6 @@ export async function POST(request: Request) {
       relationshipCount: relationships.length,
     };
 
-    // Save snapshot with relationships
     const { data: insertedSnapshot, error: insertError } = await serviceClient
       .from('schema_snapshots')
       .insert({

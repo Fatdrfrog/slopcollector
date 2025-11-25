@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -30,20 +30,16 @@ interface ERDCanvasProps {
 function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = [] }: ERDCanvasProps) {
   const { fitView, getNode } = useReactFlow();
   
-  // Use custom hook for all layout logic - eliminates 80+ lines of duplicate code
   const { nodes: layoutNodes, edges: layoutEdges, relayout } = useGraphLayout(tables, suggestions);
   
-  // React Flow state management
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>(layoutNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutEdges);
 
-  // Update nodes/edges when layout changes (tables/suggestions change)
   useEffect(() => {
     setNodes(layoutNodes);
     setEdges(layoutEdges);
   }, [layoutNodes, layoutEdges, setNodes, setEdges]);
 
-  // Fast update: Only update selection state without recalculating layout
   useEffect(() => {
     setNodes((nds) =>
       nds.map((node) => {
@@ -51,7 +47,6 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
 
         const isSelected = selectedTable === node.id;
         
-        // Only update if selection state changed
         if (node.data.isSelected === isSelected) {
           return node;
         }
@@ -61,17 +56,15 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
           data: {
             ...node.data,
             isSelected,
-            onSelect: onTableSelect, // Update callback
+            onSelect: onTableSelect,
           },
         };
       })
     );
 
-    // Focus on selected table
     if (selectedTable) {
       const node = getNode(selectedTable);
       if (node) {
-        // Center and zoom to the selected table
         fitView({
           nodes: [node],
           duration: GRAPH_CONFIG.animation.fitViewDuration,
@@ -82,7 +75,6 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
     }
   }, [selectedTable, onTableSelect, setNodes, getNode, fitView]);
 
-  // Memoize node types to prevent recreation
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       tableNode: TableNode,
@@ -90,26 +82,21 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
     []
   );
 
-  // Handle pane click to deselect
   const handlePaneClick = useCallback(() => {
     onTableSelect(null);
   }, [onTableSelect]);
 
-  // Validate edge connections to prevent errors with missing handles
   const isValidConnection = useCallback((connection: Edge | Connection) => {
     const sourceNode = getNode(connection.source);
     const targetNode = getNode(connection.target);
     
-    // Ensure both nodes exist
     if (!sourceNode || !targetNode) {
       return false;
     }
     
-    // Valid handle IDs
     const validSourceHandles = ['left', 'right', 'top', 'bottom'];
     const validTargetHandles = ['left-target', 'right-target', 'top-target', 'bottom-target'];
     
-    // Validate handles exist (handle undefined as valid)
     const hasValidSourceHandle = connection.sourceHandle === undefined || 
                                  connection.sourceHandle === null ||
                                  validSourceHandles.includes(connection.sourceHandle);
@@ -120,11 +107,9 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
     return hasValidSourceHandle && hasValidTargetHandle;
   }, [getNode]);
 
-  // Handle manual relayout with fit view
   const handleRelayout = useCallback(() => {
     relayout();
     
-    // Fit view after layout is complete
     setTimeout(() => {
       fitView({ 
         padding: GRAPH_CONFIG.animation.fitViewPadding, 
@@ -132,8 +117,7 @@ function ERDCanvasInner({ tables, selectedTable, onTableSelect, suggestions = []
       });
     }, GRAPH_CONFIG.animation.layoutTransitionDelay);
   }, [relayout, fitView]);
-
-  // Minimap node coloring based on state
+  
   const getMiniMapNodeColor = useCallback((node: Node<TableNodeData>) => {
     if (!node.data) {
       return GRAPH_CONFIG.colors.default;

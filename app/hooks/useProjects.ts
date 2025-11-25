@@ -8,10 +8,6 @@ import { queryKeys } from '@/lib/constants/query-keys';
 import { activeProjectIdAtom } from '@/app/store/atoms';
 import { useSupabaseClient } from '@/lib/auth/hooks';
 
-/**
- * Extended type for connected_projects with GitHub fields
- * (Database types are auto-generated and may lag behind schema changes)
- */
 interface ConnectedProjectRow {
   id: string;
   project_name: string | null;
@@ -41,19 +37,6 @@ interface UseProjectsResult {
   refresh: () => Promise<void>;
 }
 
-/**
- * Hook to fetch and manage connected Supabase projects
- * 
- * Features:
- * - Uses React Query for server state with query key factory
- * - Integrates with Jotai for active project selection (persisted to localStorage)
- * - Automatic cache invalidation and refetching
- * 
- * Usage:
- * ```tsx
- * const { projects, activeProjectId, setActiveProjectId, loading } = useProjects();
- * ```
- */
 export function useProjects(): UseProjectsResult {
   const supabase = useSupabaseClient();
   const [activeProjectId, setActiveProjectId] = useAtom(activeProjectIdAtom);
@@ -83,11 +66,9 @@ export function useProjects(): UseProjectsResult {
         githubRepoUrl: row.github_repo_url,
       }));
     },
-    // Refetch every 5 minutes
     staleTime: 5 * 60 * 1000,
   });
 
-  // Auto-select first active project if none selected
   useEffect(() => {
     if (!activeProjectId && projects.length > 0) {
       const preferred = projects.find((project: ProjectSummary) => project.isActive) || projects[0];

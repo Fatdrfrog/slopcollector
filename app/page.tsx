@@ -27,9 +27,6 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 
-/**
- * Main application component for the ERD Panel
- */
 export default function Home() {
   const {
     projects,
@@ -48,19 +45,16 @@ export default function Home() {
   const { user, loading: authLoading } = useSupabaseSession();
   const supabaseClient = useSupabaseClient();
 
-  // UI state
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
 
-  // Extract project state management to custom hook first
   const { hasGeneratedBefore, setHasGeneratedBefore } = useProjectState(
     activeProjectId,
     suggestions.length
   );
 
-  // Extract AI advice generation logic to custom hook
   const {
     isGeneratingAdvice,
     adviceError,
@@ -69,18 +63,14 @@ export default function Home() {
     handleGenerateAdvice,
   } = useAdviceGeneration(activeProjectId, refresh, setHasGeneratedBefore, setShowSuggestions);
 
-  // Extract auth redirect logic to custom hook
   const { isProcessingCallback } = useAuthRedirect(user, authLoading);
 
-  // Memoize table selection handler to prevent ERDCanvas re-renders
   const handleTableSelect = useCallback((tableId: string | null) => {
     setSelectedTable(tableId);
   }, []);
 
-  // Auto-show ConnectProjectDialog for first-time users (onboarding)
   useEffect(() => {
     if (!projectsLoading && !authLoading && user && projects.length === 0) {
-      // Small delay to let the UI settle
       const timer = setTimeout(() => {
         setShowConnectDialog(true);
       }, 500);
@@ -111,7 +101,6 @@ export default function Home() {
         throw new Error(data.error ?? response.statusText);
       }
 
-      // Refresh to get the new schema
       await refresh();
       
       setStatusMessage({ type: 'success', message: 'Schema synced successfully!' });
@@ -123,19 +112,16 @@ export default function Home() {
     }
   }, [activeProjectId, refresh, setStatusMessage]);
 
-  // Table navigation handlers
   const { selectTable, selectNextTable, clearSelection } = useTableNavigation(
     tables,
     selectedTable,
     setSelectedTable
   );
 
-  // Toggle suggestions panel
   const toggleSuggestions = useCallback(() => {
     setShowSuggestions(prev => !prev);
   }, []);
 
-  // Keyboard shortcuts
   useKeyboardShortcuts(
     {
       onCommandK: () => setShowCommandPalette(true),
@@ -144,16 +130,15 @@ export default function Home() {
         clearSelection();
       },
       onTab: selectNextTable,
-      onCtrlB: toggleSuggestions, // Ctrl+B to toggle suggestions panel
-      onCommandR: handleSync, // Cmd/Ctrl+R to refresh
-      onCommandG: handleGenerateAdvice, // Cmd/Ctrl+G to generate AI advice
+      onCtrlB: toggleSuggestions,
+      onCommandR: handleSync,
+      onCommandG: handleGenerateAdvice,
     },
     [selectNextTable, clearSelection, toggleSuggestions, handleSync, handleGenerateAdvice]
   );
 
   const selectedTableData = tables.find(t => t.id === selectedTable);
 
-  // Show loading state while checking auth or processing callback
   if (authLoading || isProcessingCallback || !user) {
     return (
       <LoadingScreen 
@@ -164,7 +149,6 @@ export default function Home() {
     
   return (
     <div className="h-screen w-screen flex flex-col bg-[#0f0f0f]">
-      {/* Header */}
       <Header
         tableCount={tables.length}
         showSuggestions={showSuggestions}
@@ -242,7 +226,6 @@ export default function Home() {
         )}
       </ResizablePanelGroup>
 
-      {/* Command Palette */}
       {showCommandPalette && (
         <CommandPalette
           tables={tables}
@@ -254,7 +237,6 @@ export default function Home() {
         />
       )}
 
-      {/* Status Indicator */}
       <AnimatePresence>
         {statusMessage && (
           <StatusIndicator
@@ -265,7 +247,6 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Debug Panel (development only) */}
       <DebugPanel
         activeProjectId={activeProjectId}
         projectsCount={projects.length}
@@ -274,7 +255,6 @@ export default function Home() {
         userId={user?.id}
       />
 
-      {/* Connect Project Dialog (auto-shown for onboarding) */}
       <ConnectProjectDialog
         open={showConnectDialog}
         onOpenChange={setShowConnectDialog}

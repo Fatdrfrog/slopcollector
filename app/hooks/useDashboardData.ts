@@ -54,7 +54,6 @@ export function useDashboardData(projectId?: string): DashboardData {
         }
         index.columns.forEach((column) => {
           const normalized = column.replace(/"/g, '').split(' ')[0];
-          // Non-null assertion safe because we just created it if it didn't exist
           acc[key]!.add(normalized!);
         });
         return acc;
@@ -83,16 +82,9 @@ export function useDashboardData(projectId?: string): DashboardData {
         nullable: column.isNullable,
         indexed: indexColumns[key]?.has(column.columnName) ?? false,
         primaryKey: column.isPrimaryKey ?? false,
-        foreignKey: column.foreignKeyTo, // Add FK relationship
+        foreignKey: column.foreignKeyTo,
       }));
       
-      // Debug: Log FK columns found
-      const fkColumns = columnEntries.filter(c => c.foreignKey);
-      if (fkColumns.length > 0) {
-        console.log(`🔗 Table ${table.tableName} has ${fkColumns.length} FK columns:`, 
-          fkColumns.map(c => `${c.name} → ${c.foreignKey}`));
-      }
-
       const rowCount = table.rowEstimate ?? undefined;
       const columnCount = columnEntries.length;
 
@@ -109,8 +101,6 @@ export function useDashboardData(projectId?: string): DashboardData {
 
   const fetchSuggestions = useCallback(
     async (projectId: string) => {
-      console.log('📊 Fetching suggestions for project:', projectId);
-      
       const { data, error: queryError } = await supabase
         .from('optimization_suggestions')
         .select('*')
@@ -123,7 +113,6 @@ export function useDashboardData(projectId?: string): DashboardData {
         throw queryError;
       }
 
-      console.log(`✅ Found ${data?.length || 0} suggestions for project ${projectId}`);
       return (data ?? []) as SuggestionRow[];
     },
     [supabase]
@@ -181,7 +170,6 @@ export function useDashboardData(projectId?: string): DashboardData {
 
       const snapshot = await fetchLatestSnapshot();
 
-      // Fetch suggestions and code patterns for this project
       const [suggestionItems, codePatterns] = await Promise.all([
         fetchSuggestions(projectId),
         fetchCodePatterns(projectId),
@@ -190,44 +178,16 @@ export function useDashboardData(projectId?: string): DashboardData {
       if (!snapshot || !snapshot.tables_data) {
         setTables([]);
       } else {
-        // Debug: Log what we actually got from database
-        console.log('📊 Schema Snapshot Data:', {
-          tables_count: Array.isArray(snapshot.tables_data) ? snapshot.tables_data.length : 0,
-          columns_count: Array.isArray(snapshot.columns_data) ? snapshot.columns_data.length : 0,
-          indexes_count: Array.isArray(snapshot.indexes_data) ? snapshot.indexes_data.length : 0,
-          has_columns_data: !!snapshot.columns_data,
-          snapshot_id: snapshot.id,
-          created_at: snapshot.created_at,
-        });
-
-        // Build schema from stored data - ensure we pass columns!
         const schema: DatabaseSchemaSnapshot = {
           tables: (snapshot.tables_data as TableSchema[]) || [],
           columns: (snapshot.columns_data as any[]) || [], 
           indexes: (snapshot.indexes_data as IndexSchema[]) || [],
         };
 
-        // Debug: Log the schema we're mapping
-        console.log('🗂️ Mapping schema to tables:', {
-          tables: schema.tables.length,
-          columns: schema.columns.length,
-          indexes: schema.indexes.length,
-        });
-
         const mappedTables = mapSnapshotToTables(schema);
-        console.log('✅ Mapped tables:', {
-          count: mappedTables.length,
-          sample: mappedTables[0] ? {
-            name: mappedTables[0].name,
-            columnCount: mappedTables[0].columns.length,
-            hasColumns: mappedTables[0].columns.length > 0,
-          } : null,
-        });
-
         setTables(mappedTables);
       }
 
-      // Group code patterns by table and column
       const patternsByTableColumn = codePatterns.reduce<Record<string, CodeReference[]>>(
         (acc, pattern) => {
           const key = `${pattern.table_name}:${pattern.column_name || '*'}`;
@@ -246,12 +206,10 @@ export function useDashboardData(projectId?: string): DashboardData {
       );
 
       const mappedSuggestions: Suggestion[] = suggestionItems.map((item) => {
-        // Find matching code patterns for this suggestion
         const patternKey = `${item.table_name}:${item.column_name || '*'}`;
         const columnPatterns = patternsByTableColumn[patternKey];
         const tablePatterns = patternsByTableColumn[`${item.table_name}:*`];
 
-        // Combine column-specific and table-wide patterns
         const codeReferences = [
           ...(columnPatterns || []),
           ...(tablePatterns || []),
@@ -271,7 +229,6 @@ export function useDashboardData(projectId?: string): DashboardData {
         };
       });
 
-      console.log(`✅ Mapped ${mappedSuggestions.length} suggestions with code references`);
       setSuggestions(mappedSuggestions);
     } catch (err) {
       console.error('❌ Dashboard data fetch error:', err);

@@ -12,8 +12,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  
   title: "SlopCollector - Find the slop in your Supabase",
   description: "The raccoon that cleans up your database mess. Connect Supabase, find missing indexes, catch slow queries.",
+  icons: {
+    icon: '/logo.jpg',
+  },
+  openGraph: {
+    images: ['/logo.jpg'],
+  },
 };
 
 export default function RootLayout({

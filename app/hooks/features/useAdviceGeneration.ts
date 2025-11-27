@@ -18,28 +18,36 @@ export function useAdviceGeneration(
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
 
   useEffect(() => {
-    if (!isGeneratingAdvice || !activeProjectId || !supabaseClient) return;
+    if (!activeProjectId || !supabaseClient) return;
 
-    const pollInterval = setInterval(async () => {
-      const { data: pendingJobs } = await supabaseClient
-        .from('analysis_jobs')
-        .select('id')
-        .eq('project_id', activeProjectId)
-        .eq('job_type', 'ai_advice')
-        .eq('status', 'pending')
-        .limit(1);
+    const channel = supabaseClient.channel(`project-${activeProjectId}`);
 
-      if (!pendingJobs || pendingJobs.length === 0) {
+    channel
+      .on('broadcast', { event: 'advice-completed' }, async (payload: any) => {
+        const data = payload.payload;
         setIsGeneratingAdvice(false);
-        clearInterval(pollInterval);
-        refresh();
-        setStatusMessage({ type: 'success', message: 'Analysis completed!' });
-        setTimeout(() => setStatusMessage(null), 3000);
-      }
-    }, 3000);
+        await refresh();
+        setHasGeneratedBefore(true);
+        setShowSuggestions(true);
+        setStatusMessage({
+          type: 'success',
+          message: `Generated ${data.result?.newSuggestions || 0} optimization suggestions!`
+        });
+        setTimeout(() => setStatusMessage(null), 4000);
+      })
+      .on('broadcast', { event: 'advice-failed' }, (payload: any) => {
+        const data = payload.payload;
+        setIsGeneratingAdvice(false);
+        setAdviceError(data.error || 'Analysis failed');
+        setStatusMessage({ type: 'error', message: data.error || 'Analysis failed' });
+        setTimeout(() => setStatusMessage(null), 5000);
+      })
+      .subscribe();
 
-    return () => clearInterval(pollInterval);
-  }, [isGeneratingAdvice, activeProjectId, supabaseClient, refresh]);
+    return () => {
+      supabaseClient.removeChannel(channel);
+    };
+  }, [activeProjectId, supabaseClient, refresh, setHasGeneratedBefore, setShowSuggestions]);
 
   const handleGenerateAdvice = useCallback(async () => {
     if (!activeProjectId) {
@@ -49,7 +57,7 @@ export function useAdviceGeneration(
 
     setIsGeneratingAdvice(true);
     setAdviceError(undefined);
-    setStatusMessage({ type: 'loading', message: 'GPT-5 analyzing your schema...' });
+    setStatusMessage({ type: 'loading', message: 'Queuing analysis...' });
 
     try {
       const response = await fetch('/api/internal/advice', {
@@ -65,13 +73,16 @@ export function useAdviceGeneration(
 
       const result = await response.json();
 
-      if (result.status === 'completed') {
+      if (result.status === 'queued') {
+        setStatusMessage({ type: 'loading', message: 'Analysis queued. Waiting for worker...' });
+      } else {
+         // Fallback if sync for some reason
         await refresh();
         setHasGeneratedBefore(true);
         setShowSuggestions(true);
         setStatusMessage({
-          type: 'success',
-          message: `Generated ${result.result?.newSuggestions || 0} optimization suggestions!`
+            type: 'success',
+            message: `Generated ${result.result?.newSuggestions || 0} optimization suggestions!`
         });
         setTimeout(() => setStatusMessage(null), 4000);
         setIsGeneratingAdvice(false);
@@ -84,7 +95,7 @@ export function useAdviceGeneration(
       setTimeout(() => setStatusMessage(null), 5000);
       setIsGeneratingAdvice(false);
     }
-  }, [activeProjectId, refresh]);
+  }, [activeProjectId, refresh, setHasGeneratedBefore, setShowSuggestions]);
 
   return {
     isGeneratingAdvice,

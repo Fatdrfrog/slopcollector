@@ -70,75 +70,45 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { generateAIAdviceForProject, storeAdviceSuggestions } = await import('@/lib/ai/adviceService');
-    
-    const result = await generateAIAdviceForProject(serviceClient, project.id, {
-      projectName: project.project_name || undefined,
-      skipRecentCheck: false,
+    const { qstashClient } = await import('@/lib/upstash');
+
+    // Construct the URL for the worker
+    // Assuming the app is deployed and accessible via a public URL or configured QStash URL
+    // For local dev with ngrok/tunnel, this needs to be the public URL
+    // For production, it's the production URL
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+    const workerUrl = `${appUrl}/api/workers/advice`;
+
+    await qstashClient.publishJSON({
+      url: workerUrl,
+      body: {
+        projectId: project.id,
+        jobId: job.id,
+        projectName: project.project_name,
+      },
     });
-
-    const { data: snapshot } = await serviceClient
-      .from('schema_snapshots')
-      .select('id, tables_data, columns_data, indexes_data')
-      .eq('project_id', project.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!snapshot) {
-      throw new Error('No schema snapshot found');
-    }
-
-    const storeResult = await storeAdviceSuggestions(
-      serviceClient,
-      project.id,
-      snapshot.id,
-      result.suggestions,
-      {
-        schemaSnapshot: {
-          tables: (snapshot.tables_data as TableSchema[]) || [],
-          columns: (snapshot.columns_data as ColumnSchema[]) || [],
-          indexes: (snapshot.indexes_data as IndexSchema[]) || [],
-        },
-      }
-    );
-    
-    await serviceClient
-      .from('analysis_jobs')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        result_data: {
-          summary: result.summary,
-          stats: result.stats,
-          ...storeResult,
-        },
-        suggestions_count: storeResult.newSuggestions,
-      })
-      .eq('id', job.id);
     
     return NextResponse.json({
       jobId: job.id,
-      status: 'completed',
-      message: 'AI advice generated successfully',
-      result: storeResult,
+      status: 'queued',
+      message: 'AI advice generation queued',
     });
-  } catch (adviceError) {
-    console.error('AI advice generation error:', adviceError);
+  } catch (error) {
+    console.error('Failed to queue advice generation:', error);
     
     await serviceClient
       .from('analysis_jobs')
       .update({
         status: 'failed',
         completed_at: new Date().toISOString(),
-        error_message: adviceError instanceof Error ? adviceError.message : 'Unknown error',
+        error_message: error instanceof Error ? error.message : 'Failed to queue job',
       })
       .eq('id', job.id);
     
     return NextResponse.json(
       {
-        error: 'Failed to generate AI advice',
-        details: adviceError instanceof Error ? adviceError.message : 'Unknown error',
+        error: 'Failed to queue AI advice',
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );

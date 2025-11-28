@@ -72,6 +72,8 @@ export async function generateAIAdviceForProject(
     indexes: (snapshot.indexes_data as any[]) || [],
   };
 
+  console.log(`[Service] Snapshot loaded. Tables: ${schemaSnapshot.tables.length}, Columns: ${schemaSnapshot.columns.length}`);
+
   let codePatterns: CodePatternContext[] | undefined;
   if (includeCodePatterns) {
     const { data: patterns } = await serviceClient
@@ -95,6 +97,7 @@ export async function generateAIAdviceForProject(
     projectName: options?.projectName || 'Unnamed Project',
     codePatterns,
   });
+  console.log('[Service] generateAdviceFromSnapshot completed. Advisories:', advice.advisories.length);
 
   const suggestions = advice.advisories.map((item) => ({
     tableName: item.table || 'unknown',

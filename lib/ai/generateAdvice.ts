@@ -247,6 +247,8 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
     ? 16000  
     : 4000; 
 
+  console.log(`[AI] Sending request to OpenAI. Model: ${model}, MaxTokens: ${maxTokens}`);
+
   let response;
   try {
     response = await openai.chat.completions.create({
@@ -259,6 +261,7 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
       ],
       max_completion_tokens: maxTokens,
     });
+    console.log('[AI] OpenAI response received.');
   } catch (error) {
     console.error('❌ OpenAI API error:', error);
     throw new Error(
@@ -269,6 +272,8 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
   const choice = response.choices[0];
   const finishReason = choice?.finish_reason;
   const usage = response.usage;
+
+  console.log(`[AI] Finish reason: ${finishReason}, Tokens used: ${usage?.total_tokens} (Reasoning: ${usage?.completion_tokens_details?.reasoning_tokens})`);
 
 
   if (!choice?.message?.content && finishReason === 'length') {

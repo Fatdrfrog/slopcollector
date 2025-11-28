@@ -7,6 +7,8 @@ async function handler(request: Request) {
   const body = await request.json();
   const { projectId, jobId, projectName } = body;
 
+  console.log(`[Worker] Starting advice generation for job ${jobId} (Project: ${projectId})`);
+
   if (!projectId || !jobId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
@@ -16,10 +18,12 @@ async function handler(request: Request) {
   try {
     const { generateAIAdviceForProject, storeAdviceSuggestions } = await import('@/lib/ai/adviceService');
 
+    console.log('[Worker] Calling generateAIAdviceForProject...');
     const result = await generateAIAdviceForProject(serviceClient, projectId, {
       projectName: projectName || undefined,
       skipRecentCheck: true, // Already checked in the initial request
     });
+    console.log('[Worker] generateAIAdviceForProject returned. Summary length:', result.summary.length);
 
     const { data: snapshot } = await serviceClient
       .from('schema_snapshots')
@@ -46,6 +50,7 @@ async function handler(request: Request) {
         },
       }
     );
+    console.log('[Worker] Suggestions stored. New:', storeResult.newSuggestions);
 
     await serviceClient
       .from('analysis_jobs')
@@ -75,6 +80,7 @@ async function handler(request: Request) {
     });
     serviceClient.removeChannel(channel);
 
+    console.log('[Worker] Job completed successfully.');
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Worker failed:', error);

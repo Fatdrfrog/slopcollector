@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase/serviceClient';
 import { getServerClient } from '@/lib/supabase/server';
 import { createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse } from '@/lib/utils/api-errors';
-import { ColumnSchema, IndexSchema, TableSchema } from '@/lib/types';
 
 interface AdviceRequestBody {
   projectId?: string;
@@ -72,10 +71,6 @@ export async function POST(request: Request) {
   try {
     const { qstashClient } = await import('@/lib/upstash');
 
-    // Construct the URL for the worker
-    // Assuming the app is deployed and accessible via a public URL or configured QStash URL
-    // For local dev with ngrok/tunnel, this needs to be the public URL
-    // For production, it's the production URL
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
     const workerUrl = `${appUrl}/api/workers/advice`;
 

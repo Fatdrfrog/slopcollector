@@ -246,8 +246,6 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
     ? 16000  
     : 4000; 
 
-  const startTime = Date.now();
-
   let response;
   try {
     response = await openai.chat.completions.create({

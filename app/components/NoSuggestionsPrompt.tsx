@@ -9,10 +9,6 @@ interface NoSuggestionsPromptProps {
   hasGeneratedBefore: boolean;
 }
 
-/**
- * Prompt shown when no suggestions exist
- * Encourages users to run AI advice
- */
 export function NoSuggestionsPrompt({
   onGenerateAdvice,
   isGenerating,
@@ -27,7 +23,7 @@ export function NoSuggestionsPrompt({
       >
         <div className="text-center max-w-sm">
           <div className="relative w-20 h-20 mx-auto mb-6">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#7ed321]/30 to-[#4ecdc4]/30 rounded-full animate-pulse" />
+            <div className="absolute inset-0 bg-linear-to-br from-[#7ed321]/30 to-[#4ecdc4]/30 rounded-full animate-pulse" />
             <div className="relative w-full h-full bg-[#2a2a2a] rounded-full flex items-center justify-center">
               <Sparkles className="w-10 h-10 text-[#7ed321] animate-pulse" />
             </div>
@@ -50,7 +46,7 @@ export function NoSuggestionsPrompt({
       className="flex-1 flex items-center justify-center p-8"
     >
       <div className="text-center max-w-md">
-        <div className="w-16 h-16 bg-gradient-to-br from-[#7ed321]/20 to-[#4ecdc4]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-linear-to-br from-[#7ed321]/20 to-[#4ecdc4]/20 rounded-full flex items-center justify-center mx-auto mb-4">
           <Sparkles className="w-8 h-8 text-[#7ed321]" />
         </div>
         <h3 className="text-xl font-bold text-white mb-2 font-mono">

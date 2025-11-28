@@ -39,10 +39,6 @@ interface HeaderProps {
   isGeneratingAdvice: boolean;
 }
 
-/**
- * Application header with controls
- * Memoized to prevent re-renders unless props actually change
- */
 export const Header = memo(function Header({
   tableCount,
   showSuggestions,
@@ -66,7 +62,7 @@ export const Header = memo(function Header({
 
   return (
     <>
-    <header className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-6">
+    <header className="h-16 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 flex items-center justify-between px-6">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary/10 rounded-lg">

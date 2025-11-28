@@ -7,8 +7,6 @@ async function handler(request: Request) {
   const body = await request.json();
   const { projectId, jobId, projectName } = body;
 
-  console.log(`[Worker] Starting advice generation for job ${jobId} (Project: ${projectId})`);
-
   if (!projectId || !jobId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
@@ -18,13 +16,11 @@ async function handler(request: Request) {
   try {
     const { generateAIAdviceForProject, storeAdviceSuggestions } = await import('@/lib/ai/adviceService');
 
-    console.log('[Worker] Calling generateAIAdviceForProject...');
     const result = await generateAIAdviceForProject(serviceClient, projectId, {
       projectName: projectName || undefined,
-      skipRecentCheck: true, // Already checked in the initial request
+      skipRecentCheck: true, 
     });
-    console.log('[Worker] generateAIAdviceForProject returned. Summary length:', result.summary.length);
-
+  
     const { data: snapshot } = await serviceClient
       .from('schema_snapshots')
       .select('id, tables_data, columns_data, indexes_data')
@@ -50,7 +46,6 @@ async function handler(request: Request) {
         },
       }
     );
-    console.log('[Worker] Suggestions stored. New:', storeResult.newSuggestions);
 
     await serviceClient
       .from('analysis_jobs')
@@ -66,7 +61,6 @@ async function handler(request: Request) {
       })
       .eq('id', jobId);
 
-    // Trigger Supabase Realtime Broadcast
     const channel = serviceClient.channel(`project-${projectId}`);
     await channel.subscribe();
     await channel.send({
@@ -80,11 +74,8 @@ async function handler(request: Request) {
     });
     serviceClient.removeChannel(channel);
 
-    console.log('[Worker] Job completed successfully.');
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Worker failed:', error);
-
     await serviceClient
       .from('analysis_jobs')
       .update({
@@ -94,13 +85,12 @@ async function handler(request: Request) {
       })
       .eq('id', jobId);
       
-      // Trigger failure event
-      const channel = serviceClient.channel(`project-${projectId}`);
-      await channel.subscribe();
-      await channel.send({
-        type: 'broadcast',
-        event: 'advice-failed',
-        payload: {
+    const channel = serviceClient.channel(`project-${projectId}`);
+    await channel.subscribe();
+    await channel.send({
+      type: 'broadcast',
+      event: 'advice-failed',
+      payload: {
           jobId,
           error: error instanceof Error ? error.message : 'Unknown error',
         },

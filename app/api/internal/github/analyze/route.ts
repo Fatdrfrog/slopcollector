@@ -123,10 +123,12 @@ export async function POST(request: Request) {
         return acc;
       }, {} as Record<string, number>);
 
+
     const suggestions = Object.entries(topColumns)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([col, freq]) => `Consider indexing ${col} (used in WHERE ${freq}x)`);
+
 
     return NextResponse.json({
       success: true,

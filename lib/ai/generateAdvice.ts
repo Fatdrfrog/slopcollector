@@ -17,12 +17,12 @@ export const AdviceItemSchema = z.object({
     'normalization',
   ]).describe('Type of optimization'),
   table: z.string().describe('Affected table name'),
-  column: z.string().optional().describe('Affected column name if applicable'),
+  column: z.string().optional().describe('Affected column name if applicable').nullable(),
   headline: z.string().min(10).max(100).describe('Short, actionable title (10-100 chars)'),
   description: z.string().min(20).max(500).describe('Detailed explanation with performance impact (20-500 chars)'),
-  remediation: z.string().optional().describe('SQL statement to fix the issue'),
-  estimatedImpact: z.enum(['high', 'medium', 'low']).optional().describe('Expected performance improvement'),
-  affectedQueries: z.array(z.string()).optional().describe('Common query patterns affected'),
+  remediation: z.string().optional().describe('SQL statement to fix the issue').nullable(),
+  estimatedImpact: z.enum(['high', 'medium', 'low']).optional().describe('Expected performance improvement').nullable(),
+  affectedQueries: z.array(z.string()).optional().describe('Common query patterns affected').nullable(),
 });
 
 export const GeneratedAdviceSchema = z.object({
@@ -33,7 +33,7 @@ export const GeneratedAdviceSchema = z.object({
     criticalIssues: z.number().int().min(0),
     warningIssues: z.number().int().min(0),
     infoIssues: z.number().int().min(0),
-  }).optional().describe('Issue statistics'),
+  }).optional().describe('Issue statistics').nullable(),
 });
 
 export type GeneratedAdviceItem = z.infer<typeof AdviceItemSchema>;
@@ -209,7 +209,6 @@ export async function generateAdviceFromSnapshot(
         `  - ${p.tableName}.${p.columnName || '*'} used in ${p.patternType.toUpperCase()} at ${p.filePath}${p.lineNumber ? `:${p.lineNumber}` : ''} (${p.frequency}x)`
       )
       .join('\n');
-
     codeContext = `\n\nActual Codebase Query Patterns (PRIORITIZE THESE):
 ${patterns}
 
@@ -247,7 +246,7 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
     ? 16000  
     : 4000; 
 
-  console.log(`[AI] Sending request to OpenAI. Model: ${model}, MaxTokens: ${maxTokens}`);
+  const startTime = Date.now();
 
   let response;
   try {
@@ -261,7 +260,6 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
       ],
       max_completion_tokens: maxTokens,
     });
-    console.log('[AI] OpenAI response received.');
   } catch (error) {
     console.error('❌ OpenAI API error:', error);
     throw new Error(
@@ -272,8 +270,6 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
   const choice = response.choices[0];
   const finishReason = choice?.finish_reason;
   const usage = response.usage;
-
-  console.log(`[AI] Finish reason: ${finishReason}, Tokens used: ${usage?.total_tokens} (Reasoning: ${usage?.completion_tokens_details?.reasoning_tokens})`);
 
 
   if (!choice?.message?.content && finishReason === 'length') {
@@ -303,8 +299,6 @@ Provide actionable, high-impact optimization recommendations${options.codePatter
   const validationResult = GeneratedAdviceSchema.safeParse(rawParsed);
   
   if (!validationResult.success) {
-    console.error('❌ Zod validation failed (unexpected with Structured Outputs):', validationResult.error);
-    
     const fallback = rawParsed as any;
     return {
       summary: fallback?.summary || 'Schema analysis completed',

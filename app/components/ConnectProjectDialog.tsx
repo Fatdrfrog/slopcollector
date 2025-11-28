@@ -209,7 +209,6 @@ export function ConnectProjectDialog({
 
   const generateAdvice = async (projectId: string) => {
     setStatus('analyzing');
-
     const response = await fetch('/api/internal/advice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

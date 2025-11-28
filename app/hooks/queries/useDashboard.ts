@@ -1,5 +1,7 @@
 'use client';
 
+import { useCallback } from 'react';
+
 import { useTables } from './useTables';
 import { useSuggestionsQuery } from './useSuggestionsQuery';
 import type { Table, Suggestion } from '@/lib/types';
@@ -16,12 +18,12 @@ export function useDashboard(projectId?: string): UseDashboardResult {
   const tablesQuery = useTables(projectId);
   const suggestionsQuery = useSuggestionsQuery(projectId);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     await Promise.all([
       tablesQuery.refetch(),
       suggestionsQuery.refetch(),
     ]);
-  };
+  }, [tablesQuery.refetch, suggestionsQuery.refetch]);
 
   return {
     tables: tablesQuery.data ?? [],

@@ -24,6 +24,7 @@ export function useAdviceGeneration(
 
     channel
       .on('broadcast', { event: 'advice-completed' }, async (payload: any) => {
+        console.log('[Frontend] Received advice-completed event:', payload);
         const data = payload.payload;
         setIsGeneratingAdvice(false);
         await refresh();
@@ -36,13 +37,16 @@ export function useAdviceGeneration(
         setTimeout(() => setStatusMessage(null), 4000);
       })
       .on('broadcast', { event: 'advice-failed' }, (payload: any) => {
+        console.log('[Frontend] Received advice-failed event:', payload);
         const data = payload.payload;
         setIsGeneratingAdvice(false);
         setAdviceError(data.error || 'Analysis failed');
         setStatusMessage({ type: 'error', message: data.error || 'Analysis failed' });
         setTimeout(() => setStatusMessage(null), 5000);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[Frontend] Subscription status for project-${activeProjectId}:`, status);
+      });
 
     return () => {
       supabaseClient.removeChannel(channel);
@@ -60,6 +64,7 @@ export function useAdviceGeneration(
     setStatusMessage({ type: 'loading', message: 'Queuing analysis...' });
 
     try {
+      console.log("useAdviceGeneration")
       const response = await fetch('/api/internal/advice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

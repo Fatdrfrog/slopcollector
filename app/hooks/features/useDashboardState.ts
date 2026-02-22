@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useSupabaseClient } from '@/lib/auth/hooks';
+import { useDebounce } from '@/app/hooks/useDebounce';
 import { useAuthRedirect } from '@/hooks/auth/useAuthRedirect';
 import { useSupabaseSession } from '@/hooks/auth/useSupabaseSession';
 import { useDashboard } from '@/app/hooks/queries';
@@ -22,6 +23,9 @@ export function useDashboardState() {
     loading: projectsLoading,
     error: projectsError,
   } = useProjects();
+
+  const [suggestionSearch, setSuggestionSearch] = useState('');
+  const debouncedSuggestionSearch = useDebounce(suggestionSearch, 400);
   
   const {
     tables,
@@ -29,7 +33,7 @@ export function useDashboardState() {
     loading,
     error,
     refresh,
-  } = useDashboard(activeProjectId);
+  } = useDashboard(activeProjectId, debouncedSuggestionSearch);
   
   const { user, loading: authLoading } = useSupabaseSession();
   const supabaseClient = useSupabaseClient();
@@ -164,6 +168,8 @@ export function useDashboardState() {
     toggleSuggestions,
     selectedTableData,
     displayError,
+    suggestionSearch,
+    setSuggestionSearch,
   };
 }
 

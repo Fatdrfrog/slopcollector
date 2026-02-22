@@ -137,7 +137,15 @@ export const SuggestionCard = memo(function SuggestionCard({
       </div>
       
       <p className="text-xs text-gray-300 mb-2.5 leading-relaxed">
-        {suggestion.description}
+        {suggestion.highlightedDescription ? (
+          <span
+            dangerouslySetInnerHTML={{
+              __html: suggestion.highlightedDescription.replace(/<b>/g, '<mark class="bg-amber-500/40 text-amber-100 rounded px-0.5">').replace(/<\/b>/g, '</mark>'),
+            }}
+          />
+        ) : (
+          suggestion.description
+        )}
       </p>
       
       {suggestion.codeReferences && suggestion.codeReferences.length > 0 && (

@@ -93,6 +93,8 @@ export default function Home() {
       onConnectDialogChange={state.setShowConnectDialog}
       onConnectSuccess={handleConnectSuccess}
       onDismissStatus={handleDismissStatus}
+      suggestionSearch={state.suggestionSearch}
+      onSuggestionSearchChange={state.setSuggestionSearch}
     />
   );
 }

@@ -48,6 +48,8 @@ interface DashboardLayoutProps {
   onConnectDialogChange: (open: boolean) => void;
   onConnectSuccess: () => void;
   onDismissStatus: () => void;
+  suggestionSearch?: string;
+  onSuggestionSearchChange?: (value: string) => void;
 }
 
 export function DashboardLayout({
@@ -82,6 +84,8 @@ export function DashboardLayout({
   onConnectDialogChange,
   onConnectSuccess,
   onDismissStatus,
+  suggestionSearch = '',
+  onSuggestionSearchChange,
 }: DashboardLayoutProps) {
   const displayError = projectsError || error || adviceError;
 
@@ -137,6 +141,8 @@ export function DashboardLayout({
           // Refetch suggestions after status change to sync with database
           await onRefresh();
         }}
+        suggestionSearch={suggestionSearch}
+        onSuggestionSearchChange={onSuggestionSearchChange}
       />
 
       {showCommandPalette && (

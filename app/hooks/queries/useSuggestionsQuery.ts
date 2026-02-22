@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { queryKeys } from '@/lib/constants/query-keys';
 import { useSupabaseClient } from '@/lib/auth/hooks';
+import { searchSuggestions } from '@/lib/supabase/suggestions';
 import type { Suggestion, CodeReference } from '@/lib/types';
 import { logger } from '@/lib/utils/logger';
 
@@ -85,14 +86,56 @@ function mapCategory(value: string): Suggestion['type'] {
   }
 }
 
-export function useSuggestionsQuery(projectId?: string) {
+function mapRowToSuggestion(
+  item: {
+    id: string;
+    table_name: string;
+    column_name: string | null;
+    severity: string;
+    suggestion_type: string;
+    title: string;
+    description: string;
+    sql_snippet: string | null;
+    status: string | null;
+    highlighted_description?: string;
+  },
+  patternsByTableColumn: Record<string, CodeReference[]>
+): Suggestion {
+  const patternKey = `${item.table_name}:${item.column_name || '*'}`;
+  const columnPatterns = patternsByTableColumn[patternKey];
+  const tablePatterns = patternsByTableColumn[`${item.table_name}:*`];
+  const codeReferences = [
+    ...(columnPatterns || []),
+    ...(tablePatterns || []),
+  ];
+
+  return {
+    id: item.id,
+    tableId: item.table_name,
+    tableName: item.table_name,
+    columnName: item.column_name ?? undefined,
+    severity: mapSeverity(item.severity),
+    type: mapCategory(item.suggestion_type),
+    title: item.title,
+    description: item.description,
+    highlightedDescription: item.highlighted_description,
+    impact: item.sql_snippet ?? undefined,
+    codeReferences: codeReferences.length > 0 ? codeReferences : undefined,
+    status: (item.status || 'pending') as Suggestion['status'],
+  };
+}
+
+export function useSuggestionsQuery(projectId?: string, searchQuery?: string) {
   const supabase = useSupabaseClient();
+  const hasSearch = Boolean(searchQuery?.trim());
 
   return useQuery({
-    queryKey: queryKeys.dashboard.suggestions(projectId!),
+    queryKey: [...queryKeys.dashboard.suggestions(projectId!), 'search', searchQuery ?? ''],
     queryFn: async () => {
       const [suggestionItems, codePatterns] = await Promise.all([
-        fetchSuggestions(supabase, projectId!),
+        hasSearch
+          ? searchSuggestions(supabase, projectId!, searchQuery!.trim(), 50)
+          : fetchSuggestions(supabase, projectId!),
         fetchCodePatterns(supabase, projectId!),
       ]);
 
@@ -113,35 +156,14 @@ export function useSuggestionsQuery(projectId?: string) {
         {}
       );
 
-      const mapped: Suggestion[] = suggestionItems.map((item) => {
-        const patternKey = `${item.table_name}:${item.column_name || '*'}`;
-        const columnPatterns = patternsByTableColumn[patternKey];
-        const tablePatterns = patternsByTableColumn[`${item.table_name}:*`];
+      const mapped: Suggestion[] = suggestionItems.map((item) =>
+        mapRowToSuggestion(item, patternsByTableColumn)
+      );
 
-        const codeReferences = [
-          ...(columnPatterns || []),
-          ...(tablePatterns || []),
-        ];
-
-        return {
-          id: item.id,
-          tableId: item.table_name,
-          tableName: item.table_name,
-          columnName: item.column_name ?? undefined,
-          severity: mapSeverity(item.severity),
-          type: mapCategory(item.suggestion_type),
-          title: item.title,
-          description: item.description,
-          impact: item.sql_snippet ?? undefined,
-          codeReferences: codeReferences.length > 0 ? codeReferences : undefined,
-          status: item.status || 'pending',
-        };
-      });
-
-      logger.debug(`Mapped ${mapped.length} suggestions with code references`);
+      logger.debug(`Mapped ${mapped.length} suggestions${hasSearch ? ' (search)' : ''}`);
       return mapped;
     },
     enabled: !!projectId,
-    staleTime: 60 * 1000,
+    staleTime: hasSearch ? 30 * 1000 : 60 * 1000,
   });
 }

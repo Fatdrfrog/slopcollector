@@ -27,6 +27,8 @@ interface DashboardContentProps {
   onSync: () => void;
   onGenerateAdvice: () => void;
   onStatusChange?: (suggestionId: string, newStatus: 'pending' | 'applied' | 'dismissed') => void;
+  suggestionSearch?: string;
+  onSuggestionSearchChange?: (value: string) => void;
 }
 
 export function DashboardContent({
@@ -42,6 +44,8 @@ export function DashboardContent({
   onSync,
   onGenerateAdvice,
   onStatusChange,
+  suggestionSearch = '',
+  onSuggestionSearchChange,
 }: DashboardContentProps) {
   return (
     <ResizablePanelGroup direction="horizontal" className="flex-1 flex">
@@ -81,6 +85,8 @@ export function DashboardContent({
                     onSelectTable={onTableSelect}
                     isLoading={loading}
                     onStatusChange={onStatusChange}
+                    searchQuery={suggestionSearch}
+                    onSearchChange={onSuggestionSearchChange}
                   />
                 )}
               </motion.div>

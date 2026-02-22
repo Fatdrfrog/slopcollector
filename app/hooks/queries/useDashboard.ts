@@ -14,9 +14,9 @@ interface UseDashboardResult {
   refresh: () => Promise<void>;
 }
 
-export function useDashboard(projectId?: string): UseDashboardResult {
+export function useDashboard(projectId?: string, searchQuery?: string): UseDashboardResult {
   const tablesQuery = useTables(projectId);
-  const suggestionsQuery = useSuggestionsQuery(projectId);
+  const suggestionsQuery = useSuggestionsQuery(projectId, searchQuery);
 
   const refresh = useCallback(async () => {
     await Promise.all([

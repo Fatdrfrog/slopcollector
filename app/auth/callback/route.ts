@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         .eq('id', user.id)
         .single();
 
-      if (profileError && profileError.code === 'PGRST116') {
+      if (profileError && profileError.code === 'PGRST116' && user.email) {
         const { error: insertError } = await supabase.from('user_profiles').insert({
           id: user.id,
           email: user.email,

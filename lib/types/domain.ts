@@ -38,6 +38,8 @@ export interface Suggestion {
   type: 'unused' | 'not-indexed' | 'duplicate' | 'optimization';
   title: string;
   description: string;
+  /** When present, use this for display (HTML from ts_headline with search matches highlighted) */
+  highlightedDescription?: string;
   impact?: string;
   codeReferences?: CodeReference[];
   status?: 'pending' | 'applied' | 'dismissed' | null;

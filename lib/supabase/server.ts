@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import type { Database } from '@/lib/database.types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseConfig } from './config';
 
@@ -10,11 +11,11 @@ import { getSupabaseConfig } from './config';
  * Note: Cannot be a singleton because each request needs fresh cookies
  * Uses publishable key (sb_publishable_...) or legacy anon key
  */
-export async function getServerClient(): Promise<SupabaseClient> {
+export async function getServerClient(): Promise<SupabaseClient<Database>> {
   const cookieStore = await cookies();
   const { url, publishableKey } = getSupabaseConfig();
 
-  return createServerClient(url, publishableKey, {
+  return createServerClient<Database>(url, publishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

@@ -1,7 +1,8 @@
 import { memo, useMemo } from 'react';
-import { Info, TrendingUp, Loader2 } from 'lucide-react';
+import { Info, Search, TrendingUp, Loader2 } from 'lucide-react';
 import type { Suggestion, Table } from '@/lib/types';
 import { SuggestionCard } from '@/app/components/SuggestionCard';
+import { Input } from '@/app/components/ui/input';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 
 interface SuggestionsPanelProps {
@@ -10,6 +11,8 @@ interface SuggestionsPanelProps {
   onSelectTable?: (tableId: string) => void;
   isLoading?: boolean;
   onStatusChange?: (suggestionId: string, newStatus: 'pending' | 'applied' | 'dismissed') => void;
+  searchQuery?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 export const SuggestionsPanel = memo(function SuggestionsPanel({ 
@@ -18,17 +21,22 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
   onSelectTable,
   isLoading = false,
   onStatusChange,
+  searchQuery = '',
+  onSearchChange,
 }: SuggestionsPanelProps) {
   const filteredSuggestions = useMemo(
     () => {
-      const activeSuggestions = suggestions.filter(s => 
-        s.status === 'pending' || s.status === null || !s.status
-      );
+      const hasSearch = Boolean(searchQuery?.trim());
+      const activeSuggestions = hasSearch
+        ? suggestions
+        : suggestions.filter(s => 
+            s.status === 'pending' || s.status === null || !s.status
+          );
       return selectedTable 
         ? activeSuggestions.filter(s => s.tableId === selectedTable.id) 
         : activeSuggestions;
     },
-    [suggestions, selectedTable]
+    [suggestions, selectedTable, searchQuery]
   );
 
   const groupedSuggestions = useMemo(() => {
@@ -49,7 +57,7 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
 
   return (
     <div className="h-full border-l border-border bg-background flex flex-col overflow-hidden w-full">
-      <div className="px-5 py-4 border-b border-border bg-card/60 backdrop-blur-sm shrink-0">
+      <div className="px-5 py-4 border-b border-border bg-card/60 backdrop-blur-sm shrink-0 space-y-3">
         <h2 className="text-foreground flex items-center gap-2.5">
           <div className="p-1.5 bg-primary/10 rounded-lg">
             <TrendingUp className="w-4 h-4 text-primary" />
@@ -64,7 +72,19 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
             </>
           )}
         </h2>
-        <p className="text-sm text-muted-foreground mt-2">
+        {onSearchChange && (
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search suggestions..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="pl-8 h-8"
+            />
+          </div>
+        )}
+        <p className="text-sm text-muted-foreground">
           {filteredSuggestions.length} optimization{filteredSuggestions.length !== 1 ? 's' : ''} detected
         </p>
       </div>
@@ -73,7 +93,7 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
         {isLoading ? (
           <LoadingState />
         ) : filteredSuggestions.length === 0 ? (
-          <EmptyState />
+          <EmptyState isSearchActive={Boolean(searchQuery?.trim())} />
         ) : (
           <div className="p-4 space-y-3 pr-3">
             {sortedGroups.map(severity => (
@@ -98,14 +118,16 @@ export const SuggestionsPanel = memo(function SuggestionsPanel({
   );
 });
 
-function EmptyState() {
+function EmptyState({ isSearchActive }: { isSearchActive?: boolean }) {
   return (
     <div className="p-8 text-center text-muted-foreground">
       <div className="p-3 bg-muted/30 rounded-full w-fit mx-auto mb-3">
         <Info className="w-6 h-6 text-muted-foreground" />
       </div>
-      <p>No suggestions for this selection</p>
-      <p className="text-xs text-muted-foreground/80 mt-1">Everything looks good!</p>
+      <p>{isSearchActive ? 'No suggestions match your search' : 'No suggestions for this selection'}</p>
+      <p className="text-xs text-muted-foreground/80 mt-1">
+        {isSearchActive ? 'Try different keywords' : 'Everything looks good!'}
+      </p>
     </div>
   );
 }

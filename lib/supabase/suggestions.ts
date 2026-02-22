@@ -1,13 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/database.types';
 
 /**
  * Utility functions for managing optimization suggestions
  * Handles status updates for applied/dismissed suggestions
+ * Uses Postgres RPCs for stats (get_suggestion_stats) and full-text search (search_suggestions)
  */
 
 import type { SuggestionStatus, SuggestionSeverity, OptimizationSuggestion } from '@/lib/types';
 
 export type { SuggestionStatus, SuggestionSeverity, OptimizationSuggestion };
+
+export type SearchSuggestionRow = OptimizationSuggestion & { highlighted_description?: string };
 
 /**
  * Mark a suggestion as applied by the user
@@ -165,10 +169,10 @@ export async function bulkUpdateSuggestionStatus(
 }
 
 /**
- * Get suggestion statistics for a project
+ * Get suggestion statistics for a project (uses get_suggestion_stats RPC)
  */
 export async function getSuggestionStats(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   projectId: string
 ): Promise<{
   total: number;
@@ -177,12 +181,11 @@ export async function getSuggestionStats(
   dismissed: number;
   bySeverity: Record<string, number>;
 }> {
-  const { data, error } = await supabase
-    .from('optimization_suggestions')
-    .select('status, severity')
-    .eq('project_id', projectId);
+  const { data, error } = await supabase.rpc('get_suggestion_stats', {
+    p_project_id: projectId,
+  });
 
-  if (error || !data) {
+  if (error || data == null) {
     return {
       total: 0,
       pending: 0,
@@ -192,19 +195,66 @@ export async function getSuggestionStats(
     };
   }
 
-  const stats = {
-    total: data.length,
-    pending: data.filter((s) => s.status === 'pending').length,
-    applied: data.filter((s) => s.status === 'applied').length,
-    dismissed: data.filter((s) => s.status === 'dismissed').length,
-    bySeverity: {} as Record<string, number>,
+  const parsed = data as {
+    total: number;
+    pending: number;
+    applied: number;
+    dismissed: number;
+    bySeverity: Record<string, number>;
   };
 
-  // Count by severity
-  data.forEach((s) => {
-    stats.bySeverity[s.severity] = (stats.bySeverity[s.severity] || 0) + 1;
+  return {
+    total: parsed.total ?? 0,
+    pending: parsed.pending ?? 0,
+    applied: parsed.applied ?? 0,
+    dismissed: parsed.dismissed ?? 0,
+    bySeverity: parsed.bySeverity ?? {},
+  };
+}
+
+/**
+ * Full-text search over suggestions (uses search_suggestions RPC)
+ */
+export async function searchSuggestions(
+  supabase: SupabaseClient<Database>,
+  projectId: string,
+  query: string,
+  limit = 50
+): Promise<SearchSuggestionRow[]> {
+  const trimmed = query?.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc('search_suggestions', {
+    p_project_id: projectId,
+    p_query: trimmed,
+    p_limit: limit,
   });
 
-  return stats;
+  if (error) {
+    console.error('Search suggestions error:', error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    project_id: row.project_id,
+    snapshot_id: row.snapshot_id,
+    table_name: row.table_name,
+    column_name: row.column_name,
+    suggestion_type: row.suggestion_type,
+    title: row.title,
+    description: row.description,
+    severity: row.severity,
+    impact_score: row.impact_score,
+    sql_snippet: row.sql_snippet,
+    status: (row.status ?? 'pending') as SuggestionStatus,
+    applied_at: row.applied_at,
+    dismissed_at: row.dismissed_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    highlighted_description: row.highlighted_description ?? undefined,
+  }));
 }
 

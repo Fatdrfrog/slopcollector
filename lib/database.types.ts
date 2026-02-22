@@ -268,6 +268,37 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      search_suggestions: {
+        Args: {
+          p_project_id: string
+          p_query: string
+          p_limit?: number
+        }
+        Returns: {
+          id: string
+          project_id: string
+          snapshot_id: string | null
+          table_name: string
+          column_name: string | null
+          suggestion_type: string
+          title: string
+          description: string
+          severity: string
+          impact_score: number | null
+          sql_snippet: string | null
+          status: string | null
+          applied_at: string | null
+          dismissed_at: string | null
+          created_at: string
+          updated_at: string
+          search_rank: number | null
+          highlighted_description: string | null
+        }[]
+      }
+      get_suggestion_stats: {
+        Args: { p_project_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

@@ -8,16 +8,6 @@ import { queryKeys } from '@/lib/constants/query-keys';
 import { activeProjectIdAtom } from '@/app/store/atoms';
 import { useSupabaseClient } from '@/lib/auth/hooks';
 
-interface ConnectedProjectRow {
-  id: string;
-  project_name: string | null;
-  supabase_url: string;
-  is_active: boolean | null;
-  last_synced_at: string | null;
-  github_enabled: boolean | null;
-  github_repo_url: string | null;
-}
-
 export interface ProjectSummary {
   id: string;
   projectName: string;
@@ -56,7 +46,7 @@ export function useProjects(): UseProjectsResult {
 
       if (error) throw error;
 
-      return (data as ConnectedProjectRow[] || []).map((row) => ({
+      return (data ?? []).map((row) => ({
         id: row.id,
         projectName: row.project_name || 'Supabase Project',
         supabaseUrl: row.supabase_url,

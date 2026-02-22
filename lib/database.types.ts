@@ -65,6 +65,10 @@ export type Database = {
         Row: {
           connection_error: string | null
           created_at: string
+          github_default_branch: string | null
+          github_enabled: boolean | null
+          github_last_synced_at: string | null
+          github_repo_url: string | null
           id: string
           is_active: boolean
           last_synced_at: string | null
@@ -77,6 +81,10 @@ export type Database = {
         Insert: {
           connection_error?: string | null
           created_at?: string
+          github_default_branch?: string | null
+          github_enabled?: boolean | null
+          github_last_synced_at?: string | null
+          github_repo_url?: string | null
           id?: string
           is_active?: boolean
           last_synced_at?: string | null
@@ -89,6 +97,10 @@ export type Database = {
         Update: {
           connection_error?: string | null
           created_at?: string
+          github_default_branch?: string | null
+          github_enabled?: boolean | null
+          github_last_synced_at?: string | null
+          github_repo_url?: string | null
           id?: string
           is_active?: boolean
           last_synced_at?: string | null
@@ -104,6 +116,53 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      code_patterns: {
+        Row: {
+          code_snippet: string | null
+          column_name: string | null
+          created_at: string
+          file_path: string
+          frequency: number
+          id: string
+          line_number: number | null
+          pattern_type: string
+          project_id: string
+          table_name: string
+        }
+        Insert: {
+          code_snippet?: string | null
+          column_name?: string | null
+          created_at?: string
+          file_path: string
+          frequency?: number
+          id?: string
+          line_number?: number | null
+          pattern_type: string
+          project_id: string
+          table_name: string
+        }
+        Update: {
+          code_snippet?: string | null
+          column_name?: string | null
+          created_at?: string
+          file_path?: string
+          frequency?: number
+          id?: string
+          line_number?: number | null
+          pattern_type?: string
+          project_id?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "code_patterns_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "connected_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -182,6 +241,7 @@ export type Database = {
       }
       schema_snapshots: {
         Row: {
+          columns_data: Json
           created_at: string
           id: string
           indexes_data: Json
@@ -191,6 +251,7 @@ export type Database = {
           tables_data: Json
         }
         Insert: {
+          columns_data?: Json
           created_at?: string
           id?: string
           indexes_data?: Json
@@ -200,6 +261,7 @@ export type Database = {
           tables_data?: Json
         }
         Update: {
+          columns_data?: Json
           created_at?: string
           id?: string
           indexes_data?: Json
@@ -253,6 +315,7 @@ export type Database = {
       get_latest_snapshot: {
         Args: { p_project_id: string }
         Returns: {
+          columns_data: Json
           created_at: string
           id: string
           indexes_data: Json
